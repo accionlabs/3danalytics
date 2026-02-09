@@ -36,7 +36,6 @@ export function DashboardScene() {
           key={panel.id}
           config={panel}
           target={positions[i]}
-          isFocused={focusedPanelId === panel.id}
           onFocus={() => handleFocus(panel.id)}
         />
       ))}

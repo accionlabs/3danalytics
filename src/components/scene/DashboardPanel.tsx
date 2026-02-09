@@ -7,7 +7,6 @@ import type { PanelConfig, PanelPosition } from '../../types/index.ts'
 interface DashboardPanelProps {
   config: PanelConfig
   target: PanelPosition
-  isFocused: boolean
   onFocus: () => void
 }
 
@@ -20,7 +19,6 @@ const DISTANCE_FACTOR = 400 / PX_PER_UNIT // = 2
 export function DashboardPanel({
   config,
   target,
-  isFocused,
   onFocus,
 }: DashboardPanelProps) {
   const spring = useSpring({
