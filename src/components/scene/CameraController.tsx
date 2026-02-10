@@ -309,6 +309,19 @@ export function CameraController() {
     }
   }, [gl, setDragging])
 
+  // Viewport-wide right-click → drill out (works on canvas, panels, and empty space)
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      // Allow right-click on UI chrome (nav, bottom bar)
+      const el = e.target as HTMLElement
+      if (el.closest('nav')) return
+      e.preventDefault()
+      navigateAxis('z', -1)
+    }
+    window.addEventListener('contextmenu', handleContextMenu)
+    return () => window.removeEventListener('contextmenu', handleContextMenu)
+  }, [navigateAxis])
+
   // Touch-only handler on window: scroll navigation, pinch zoom, two-finger tap, double-tap
   // Uses window-level touch events so it works even when the drei <Html> panel
   // overlay covers the canvas (which it does on mobile, ~85% of viewport).
@@ -334,6 +347,7 @@ export function CameraController() {
 
     // Two-finger state
     let prevPinchDist = 0
+    let wasTwoFinger = false
     let twoStartCenter = { x: 0, y: 0 }
     let twoLastCenter = { x: 0, y: 0 }
     let twoStartTime = 0
@@ -365,6 +379,7 @@ export function CameraController() {
         // Switch to two-finger mode — prevent browser pinch-to-zoom
         e.preventDefault()
         touchId = -1
+        wasTwoFinger = true
         prevPinchDist = touchDist(e.touches[0], e.touches[1])
         const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
         const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
@@ -426,7 +441,7 @@ export function CameraController() {
 
     const onEnd = (e: TouchEvent) => {
       // Two-finger tap detection: both fingers lifted quickly with minimal center movement
-      if (e.touches.length === 0 && prevPinchDist > 0) {
+      if (e.touches.length === 0 && wasTwoFinger) {
         const elapsed = Date.now() - twoStartTime
         const centerDist = Math.hypot(
           twoLastCenter.x - twoStartCenter.x,
@@ -435,6 +450,7 @@ export function CameraController() {
         if (elapsed < TWO_FINGER_TAP_MAX_MS && centerDist < TWO_FINGER_TAP_MAX_MOVE) {
           navigateAxis('z', -1)
         }
+        wasTwoFinger = false
         prevPinchDist = 0
       }
 

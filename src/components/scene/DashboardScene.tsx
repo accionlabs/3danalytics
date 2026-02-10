@@ -19,7 +19,7 @@ export function DashboardScene() {
   const panels = useDashboardStore((s) => s.panels)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
-  const navigateBack = useDashboardStore((s) => s.navigateBack)
+
 
   // Compute distanceFactor: when the camera distance is capped by Z_SPACING,
   // reduce df so the panel still fills 85% of the usable viewport.
@@ -113,7 +113,6 @@ export function DashboardScene() {
             isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
             onFocus={() => handlePanelClick(panel.id)}
             onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
-            onDrillOut={panel.parentId ? navigateBack : undefined}
             distanceFactor={panelDf}
           />
         )

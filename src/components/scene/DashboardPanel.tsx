@@ -10,7 +10,6 @@ interface DashboardPanelProps {
   isDimmed: boolean
   onFocus: () => void
   onItemClick?: (index: number) => void
-  onDrillOut?: () => void
   distanceFactor?: number
 }
 
@@ -26,7 +25,6 @@ export function DashboardPanel({
   isDimmed,
   onFocus,
   onItemClick,
-  onDrillOut,
   distanceFactor = DEFAULT_DF,
 }: DashboardPanelProps) {
 
@@ -45,16 +43,6 @@ export function DashboardPanel({
       onFocus()
     },
     [onFocus],
-  )
-
-  // Right-click — drill out to parent
-  const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      onDrillOut?.()
-    },
-    [onDrillOut],
   )
 
   const ChartComponent = getChartRenderer(config.chartType)
@@ -80,7 +68,6 @@ export function DashboardPanel({
       >
         <div
           onClick={handleClick}
-          onContextMenu={handleContextMenu}
           style={{
             width: pixelWidth,
             position: 'relative',
