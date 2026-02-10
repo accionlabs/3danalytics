@@ -195,7 +195,7 @@ export function CameraController() {
     const forward = new THREE.Vector3()
     let accumulatedDeltaX = 0
     let accumulatedDeltaY = 0
-    const SWIPE_THRESHOLD = 80
+    const SWIPE_THRESHOLD = 120
     let swipeCooldownX = false
     let swipeCooldownY = false
 
@@ -211,13 +211,13 @@ export function CameraController() {
 
       // Horizontal scroll → X-axis navigation
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 2) {
-        if (swipeCooldownX) return
+        if (swipeCooldownX) { accumulatedDeltaX = 0; return }
         accumulatedDeltaX += e.deltaX
         if (Math.abs(accumulatedDeltaX) >= SWIPE_THRESHOLD) {
           const direction = accumulatedDeltaX > 0 ? 1 : -1
           navigateAxis('x', direction as 1 | -1)
           swipeCooldownX = true
-          setTimeout(() => { swipeCooldownX = false }, 400)
+          setTimeout(() => { swipeCooldownX = false }, 600)
           accumulatedDeltaX = 0
         }
         accumulatedDeltaY = 0
@@ -226,14 +226,14 @@ export function CameraController() {
 
       // Vertical scroll → Y-axis navigation
       if (Math.abs(e.deltaY) > 2) {
-        if (swipeCooldownY) return
+        if (swipeCooldownY) { accumulatedDeltaY = 0; return }
         accumulatedDeltaY += e.deltaY
         if (Math.abs(accumulatedDeltaY) >= SWIPE_THRESHOLD) {
           // Scroll down = negative Y direction, scroll up = positive Y direction
           const direction = accumulatedDeltaY > 0 ? -1 : 1
           navigateAxis('y', direction as 1 | -1)
           swipeCooldownY = true
-          setTimeout(() => { swipeCooldownY = false }, 400)
+          setTimeout(() => { swipeCooldownY = false }, 600)
           accumulatedDeltaY = 0
         }
         accumulatedDeltaX = 0
@@ -244,247 +244,244 @@ export function CameraController() {
     return () => window.removeEventListener('wheel', handleWheel)
   }, [navigateAxis])
 
-  // Multi-pointer handler: single-finger drag/swipe + pinch-to-zoom
+  // Mouse-only handler on canvas: drag to pan camera
   useEffect(() => {
     const canvas = gl.domElement
-    const DRAG_THRESHOLD = 5 // px — distinguishes click from drag
+    const DRAG_THRESHOLD = 5
     const PAN_SPEED = 0.005
-
     const right = new THREE.Vector3()
     const up = new THREE.Vector3()
     const forward = new THREE.Vector3()
 
-    // Track all active pointers
-    const pointers = new Map<number, { x: number; y: number }>()
-
-    // Single-pointer state
     let primaryId = -1
     let startX = 0
     let startY = 0
     let didDrag = false
     let prevX = 0
     let prevY = 0
-    let isTouchPointer = false
 
-    // Touch scroll navigation state (accumulated delta, like wheel handler)
-    let accTouchX = 0
-    let accTouchY = 0
-    const TOUCH_SCROLL_THRESHOLD = 60 // px
-    let touchCooldownX = false
-    let touchCooldownY = false
-
-    // Pinch state
-    let prevPinchDist = 0
-
-    // Two-finger tap state (drill out)
-    let twoFingerStartCenter = { x: 0, y: 0 }
-    let twoFingerLastCenter = { x: 0, y: 0 }
-    let twoFingerStartTime = 0
-    const TWO_FINGER_TAP_MAX_DURATION = 400 // ms
-    const TWO_FINGER_TAP_MAX_MOVE = 20 // px — center movement threshold
-
-    // Double-tap state (drill out)
-    let lastTapTime = 0
-    let lastTapX = 0
-    let lastTapY = 0
-    const DOUBLE_TAP_INTERVAL = 350 // ms
-    const DOUBLE_TAP_DISTANCE = 30 // px
-
-    function getPointerDistance(): number {
-      const pts = Array.from(pointers.values())
-      if (pts.length < 2) return 0
-      const dx = pts[1].x - pts[0].x
-      const dy = pts[1].y - pts[0].y
-      return Math.hypot(dx, dy)
+    const handleDown = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') return // touch handled separately
+      primaryId = e.pointerId
+      startX = e.clientX
+      startY = e.clientY
+      didDrag = false
+      prevX = e.clientX
+      prevY = e.clientY
+      canvas.setPointerCapture(e.pointerId)
     }
 
-    const handlePointerDown = (e: PointerEvent) => {
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-
-      if (pointers.size === 1) {
-        // First pointer — start tracking for drag/swipe
-        primaryId = e.pointerId
-        startX = e.clientX
-        startY = e.clientY
-        didDrag = false
-        prevX = e.clientX
-        prevY = e.clientY
-        isTouchPointer = e.pointerType === 'touch'
-        accTouchX = 0
-        accTouchY = 0
-        canvas.setPointerCapture(e.pointerId)
-      } else if (pointers.size === 2) {
-        // Second pointer — switch to pinch/two-finger-swipe mode, cancel any drag
-        prevPinchDist = getPointerDistance()
-        const pts = Array.from(pointers.values())
-        twoFingerStartCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
-        twoFingerLastCenter = { ...twoFingerStartCenter }
-        twoFingerStartTime = Date.now()
-        if (didDrag) {
-          didDrag = false
-          setDragging(false)
-        }
-      }
-    }
-
-    const handlePointerMove = (e: PointerEvent) => {
-      const ptr = pointers.get(e.pointerId)
-      if (!ptr) return
-      ptr.x = e.clientX
-      ptr.y = e.clientY
-
-      if (pointers.size === 2) {
-        // Pinch-to-zoom
-        const dist = getPointerDistance()
-        if (prevPinchDist > 0) {
-          const delta = dist - prevPinchDist
-          forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
-          targetPos.current.addScaledVector(forward, delta * 0.005)
-        }
-        prevPinchDist = dist
-        // Track center for two-finger swipe detection
-        const pts = Array.from(pointers.values())
-        twoFingerLastCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
-        return
-      }
-
-      if (pointers.size !== 1 || e.pointerId !== primaryId) return
-
-      // Single pointer — behaviour differs between touch and mouse
+    const handleMove = (e: PointerEvent) => {
+      if (e.pointerType === 'touch' || e.pointerId !== primaryId) return
       const dx = e.clientX - startX
       const dy = e.clientY - startY
-
       if (!didDrag && Math.hypot(dx, dy) < DRAG_THRESHOLD) return
-
-      if (!didDrag) {
-        didDrag = true
-        setDragging(true)
-      }
+      if (!didDrag) { didDrag = true; setDragging(true) }
 
       const moveDx = e.clientX - prevX
       const moveDy = e.clientY - prevY
       prevX = e.clientX
       prevY = e.clientY
 
-      if (isTouchPointer) {
-        // Touch: accumulated-delta scroll navigation (like wheel handler)
-        accTouchX += moveDx
-        accTouchY += moveDy
+      forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
+      right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
+      up.crossVectors(right, forward).normalize()
+      targetPos.current.addScaledVector(right, -moveDx * PAN_SPEED)
+      targetPos.current.addScaledVector(up, moveDy * PAN_SPEED)
+      targetLookAt.current.addScaledVector(right, -moveDx * PAN_SPEED)
+      targetLookAt.current.addScaledVector(up, moveDy * PAN_SPEED)
+    }
 
-        // Horizontal scroll → X-axis navigation
-        if (!touchCooldownX && Math.abs(accTouchX) > Math.abs(accTouchY) &&
-            Math.abs(accTouchX) >= TOUCH_SCROLL_THRESHOLD) {
-          navigateAxis('x', accTouchX > 0 ? -1 : 1)
-          touchCooldownX = true
-          setTimeout(() => { touchCooldownX = false }, 400)
-          accTouchX = 0
-          accTouchY = 0
-        }
-        // Vertical scroll → Y-axis navigation
-        if (!touchCooldownY && Math.abs(accTouchY) > Math.abs(accTouchX) &&
-            Math.abs(accTouchY) >= TOUCH_SCROLL_THRESHOLD) {
-          navigateAxis('y', accTouchY > 0 ? 1 : -1)
-          touchCooldownY = true
-          setTimeout(() => { touchCooldownY = false }, 400)
-          accTouchX = 0
-          accTouchY = 0
-        }
-      } else {
-        // Mouse: pan camera
-        forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
-        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
-        up.crossVectors(right, forward).normalize()
+    const handleUp = (e: PointerEvent) => {
+      if (e.pointerType === 'touch' || e.pointerId !== primaryId) return
+      try { canvas.releasePointerCapture(e.pointerId) } catch { /* already released */ }
+      if (didDrag) setTimeout(() => setDragging(false), 50)
+      primaryId = -1
+    }
 
-        const panX = -moveDx * PAN_SPEED
-        const panY = moveDy * PAN_SPEED
+    canvas.addEventListener('pointerdown', handleDown)
+    canvas.addEventListener('pointermove', handleMove)
+    canvas.addEventListener('pointerup', handleUp)
+    return () => {
+      canvas.removeEventListener('pointerdown', handleDown)
+      canvas.removeEventListener('pointermove', handleMove)
+      canvas.removeEventListener('pointerup', handleUp)
+    }
+  }, [gl, setDragging])
 
-        targetPos.current.addScaledVector(right, panX)
-        targetPos.current.addScaledVector(up, panY)
-        targetLookAt.current.addScaledVector(right, panX)
-        targetLookAt.current.addScaledVector(up, panY)
+  // Touch-only handler on window: scroll navigation, pinch zoom, two-finger tap, double-tap
+  // Uses window-level touch events so it works even when the drei <Html> panel
+  // overlay covers the canvas (which it does on mobile, ~85% of viewport).
+  useEffect(() => {
+    const forward = new THREE.Vector3()
+    const SCROLL_THRESHOLD = 60   // px accumulated before navigating
+    const TWO_FINGER_TAP_MAX_MS = 400
+    const TWO_FINGER_TAP_MAX_MOVE = 20
+    const DOUBLE_TAP_INTERVAL = 350
+    const DOUBLE_TAP_DISTANCE = 30
+
+    // Single-finger scroll state
+    let touchId = -1
+    let prevX = 0
+    let prevY = 0
+    let accX = 0
+    let accY = 0
+    let cooldownX = false
+    let cooldownY = false
+    let didMove = false
+    let startX = 0
+    let startY = 0
+
+    // Two-finger state
+    let prevPinchDist = 0
+    let twoStartCenter = { x: 0, y: 0 }
+    let twoLastCenter = { x: 0, y: 0 }
+    let twoStartTime = 0
+
+    // Double-tap state
+    let lastTapTime = 0
+    let lastTapX = 0
+    let lastTapY = 0
+
+    function touchDist(a: Touch, b: Touch) {
+      return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+    }
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const t = e.touches[0]
+        // Ignore touches on UI chrome (nav, buttons, bottom bar)
+        const el = t.target as HTMLElement
+        if (el.closest('nav, button, [data-chrome]')) return
+        touchId = t.identifier
+        prevX = t.clientX
+        prevY = t.clientY
+        startX = t.clientX
+        startY = t.clientY
+        accX = 0
+        accY = 0
+        didMove = false
+      } else if (e.touches.length === 2) {
+        // Switch to two-finger mode
+        touchId = -1
+        prevPinchDist = touchDist(e.touches[0], e.touches[1])
+        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
+        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
+        twoStartCenter = { x: cx, y: cy }
+        twoLastCenter = { x: cx, y: cy }
+        twoStartTime = Date.now()
       }
     }
 
-    const handlePointerUp = (e: PointerEvent) => {
-      const wasInPointers = pointers.has(e.pointerId)
-      pointers.delete(e.pointerId)
-
-      if (!wasInPointers) return
-
-      // Release capture
-      try { canvas.releasePointerCapture(e.pointerId) } catch { /* already released */ }
-
-      // Detect two-finger tap (drill out): brief touch with minimal center movement
-      // Check before single-pointer handling, when going from 2 pointers to fewer
-      if (pointers.size <= 1 && prevPinchDist > 0) {
-        const elapsed = Date.now() - twoFingerStartTime
-        const centerDist = Math.hypot(
-          twoFingerLastCenter.x - twoFingerStartCenter.x,
-          twoFingerLastCenter.y - twoFingerStartCenter.y,
-        )
-        if (elapsed < TWO_FINGER_TAP_MAX_DURATION && centerDist < TWO_FINGER_TAP_MAX_MOVE) {
-          navigateAxis('z', -1)
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        // Pinch-to-zoom
+        const dist = touchDist(e.touches[0], e.touches[1])
+        if (prevPinchDist > 0) {
+          const delta = dist - prevPinchDist
+          forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
+          targetPos.current.addScaledVector(forward, delta * 0.005)
         }
+        prevPinchDist = dist
+        twoLastCenter = {
+          x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        }
+        e.preventDefault() // prevent browser zoom
+        return
       }
 
-      if (e.pointerId === primaryId) {
-        const totalDx = e.clientX - startX
-        const totalDy = e.clientY - startY
+      if (e.touches.length !== 1 || touchId === -1) return
+      const t = Array.from(e.touches).find((tt) => tt.identifier === touchId)
+      if (!t) return
 
-        // Double-tap detection (drill out): two quick taps close together
-        if (!didDrag && Math.hypot(totalDx, totalDy) < DRAG_THRESHOLD) {
+      const dx = t.clientX - prevX
+      const dy = t.clientY - prevY
+      prevX = t.clientX
+      prevY = t.clientY
+      didMove = true
+
+      // Accumulated-delta scroll navigation
+      accX += dx
+      accY += dy
+
+      if (!cooldownX && Math.abs(accX) > Math.abs(accY) && Math.abs(accX) >= SCROLL_THRESHOLD) {
+        navigateAxis('x', accX > 0 ? -1 : 1)
+        cooldownX = true
+        setTimeout(() => { cooldownX = false }, 400)
+        accX = 0
+        accY = 0
+      }
+      if (!cooldownY && Math.abs(accY) > Math.abs(accX) && Math.abs(accY) >= SCROLL_THRESHOLD) {
+        navigateAxis('y', accY > 0 ? 1 : -1)
+        cooldownY = true
+        setTimeout(() => { cooldownY = false }, 400)
+        accX = 0
+        accY = 0
+      }
+    }
+
+    const onEnd = (e: TouchEvent) => {
+      // Two-finger tap detection: both fingers lifted quickly with minimal center movement
+      if (e.touches.length === 0 && prevPinchDist > 0) {
+        const elapsed = Date.now() - twoStartTime
+        const centerDist = Math.hypot(
+          twoLastCenter.x - twoStartCenter.x,
+          twoLastCenter.y - twoStartCenter.y,
+        )
+        if (elapsed < TWO_FINGER_TAP_MAX_MS && centerDist < TWO_FINGER_TAP_MAX_MOVE) {
+          navigateAxis('z', -1)
+        }
+        prevPinchDist = 0
+      }
+
+      // Single-finger: check for double-tap (drill out)
+      if (e.touches.length === 0 && touchId !== -1) {
+        const totalDist = Math.hypot(
+          (e.changedTouches[0]?.clientX ?? startX) - startX,
+          (e.changedTouches[0]?.clientY ?? startY) - startY,
+        )
+        if (!didMove || totalDist < 10) {
           const now = Date.now()
+          const tapX = e.changedTouches[0]?.clientX ?? startX
+          const tapY = e.changedTouches[0]?.clientY ?? startY
           if (now - lastTapTime < DOUBLE_TAP_INTERVAL &&
-              Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < DOUBLE_TAP_DISTANCE) {
+              Math.hypot(tapX - lastTapX, tapY - lastTapY) < DOUBLE_TAP_DISTANCE) {
             navigateAxis('z', -1)
             lastTapTime = 0
           } else {
             lastTapTime = now
-            lastTapX = e.clientX
-            lastTapY = e.clientY
+            lastTapX = tapX
+            lastTapY = tapY
           }
         }
-
-        if (didDrag) {
-          setTimeout(() => setDragging(false), 50)
-        }
-        primaryId = -1
+        touchId = -1
       }
 
-      // If transitioning from 2 pointers to 1, re-initialize single-pointer state
-      if (pointers.size === 1) {
-        const [[id, pt]] = Array.from(pointers.entries())
-        primaryId = id
-        startX = pt.x
-        startY = pt.y
-        didDrag = false
-        prevX = pt.x
-        prevY = pt.y
+      // When going from 2 touches to 1, re-initialize single-finger state
+      if (e.touches.length === 1) {
+        const t = e.touches[0]
+        touchId = t.identifier
+        prevX = t.clientX
+        prevY = t.clientY
+        startX = t.clientX
+        startY = t.clientY
+        accX = 0
+        accY = 0
+        didMove = false
         prevPinchDist = 0
       }
     }
 
-    const handlePointerCancel = (e: PointerEvent) => {
-      pointers.delete(e.pointerId)
-      if (e.pointerId === primaryId) {
-        primaryId = -1
-        setDragging(false)
-      }
-    }
-
-    canvas.addEventListener('pointerdown', handlePointerDown)
-    canvas.addEventListener('pointermove', handlePointerMove)
-    canvas.addEventListener('pointerup', handlePointerUp)
-    canvas.addEventListener('pointercancel', handlePointerCancel)
-    canvas.addEventListener('lostpointercapture', handlePointerCancel)
+    window.addEventListener('touchstart', onStart, { passive: true })
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onEnd, { passive: true })
     return () => {
-      canvas.removeEventListener('pointerdown', handlePointerDown)
-      canvas.removeEventListener('pointermove', handlePointerMove)
-      canvas.removeEventListener('pointerup', handlePointerUp)
-      canvas.removeEventListener('pointercancel', handlePointerCancel)
-      canvas.removeEventListener('lostpointercapture', handlePointerCancel)
+      window.removeEventListener('touchstart', onStart)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onEnd)
     }
-  }, [gl, setDragging, navigateAxis])
+  }, [navigateAxis])
 
   // Camera animation inside R3F's render loop
   useFrame(({ camera }) => {
