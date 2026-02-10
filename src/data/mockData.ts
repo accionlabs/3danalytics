@@ -200,15 +200,67 @@ function segmentAccountRevenue(segmentLabel: string, seed: number): ProductReven
 }
 
 // ────────────────────────────────────────────────────────────
-// Panel definitions organized by the Spatial Grammar
+// Segments: Y=0 Startup, Y=1 SMB, Y=2 Enterprise
 // ────────────────────────────────────────────────────────────
 
-// Segments: Y=0 Startup, Y=1 SMB, Y=2 Enterprise
 const segments = [
   { y: 0, label: 'Startup' },
   { y: 1, label: 'SMB' },
   { y: 2, label: 'Enterprise' },
 ]
+
+// ────────────────────────────────────────────────────────────
+// Z=1 segment-summary data: each pipeline step shows 3 bars
+// (Startup / SMB / Enterprise) summarizing its child panels.
+// Array order matches child sort order (Y=0, Y=1, Y=2).
+// ────────────────────────────────────────────────────────────
+
+function segmentSummary(step: string): ProductRevenue[] {
+  return segments.map(({ y, label }) => {
+    let value: number
+    let growth: number
+    switch (step) {
+      case 'marketing': {
+        const products = segmentProduct(label, y * 10000 + 0)
+        value = products.reduce((sum, p) => sum + p.revenue, 0)
+        growth = Math.round(products.reduce((sum, p) => sum + p.growth, 0) / products.length * 10) / 10
+        break
+      }
+      case 'leads': {
+        const funnel = segmentFunnel(label)
+        value = funnel[0].count // top of funnel
+        growth = Math.round(seededRange(y * 7000, 5, 20) * 10) / 10
+        break
+      }
+      case 'pipeline': {
+        const rev = segmentRevenue(label, y * 10000 + 1)
+        value = rev[rev.length - 1].mrr // latest MRR
+        growth = Math.round(((rev[rev.length - 1].mrr - rev[0].mrr) / rev[0].mrr) * 100 * 10) / 10
+        break
+      }
+      case 'revenue': {
+        const kpis = segmentKpi(label, y * 20000)
+        value = kpis[1].value // MRR metric (index 1)
+        growth = kpis[1].trend
+        break
+      }
+      case 'retention': {
+        const churn = segmentChurn(label, y * 10000 + 4)
+        value = Math.round(churn.reduce((sum, c) => sum + c.churnRate, 0) / churn.length * 100) / 100
+        growth = Math.round((churn[churn.length - 1].churnRate - churn[0].churnRate) * 10) / 10
+        break
+      }
+      default:
+        value = 0
+        growth = 0
+    }
+    return { product: label, revenue: value, growth }
+  })
+}
+
+// ────────────────────────────────────────────────────────────
+// Panel definitions organized by the Spatial Grammar
+// ────────────────────────────────────────────────────────────
 
 // ── Z=0: Single root dashboard (the home view) ──
 // Entry point for the entire spatial grammar. Drill down from here.
@@ -241,7 +293,7 @@ const summaryPanels: PanelConfig[] = [
     title: 'Marketing Spend',
     chartType: 'bar',
     size: { width: 3, height: 2 },
-    data: productData,
+    data: segmentSummary('marketing'),
     semantic: { processStep: 0, segment: null, detailLevel: 1 },
     parentId: 'dashboard',
     processLabel: 'Marketing',
@@ -249,9 +301,9 @@ const summaryPanels: PanelConfig[] = [
   {
     id: 'leads',
     title: 'Leads Generated',
-    chartType: 'funnel',
-    size: { width: 2.5, height: 2.5 },
-    data: funnelData,
+    chartType: 'bar',
+    size: { width: 3, height: 2 },
+    data: segmentSummary('leads'),
     semantic: { processStep: 1, segment: null, detailLevel: 1 },
     parentId: 'dashboard',
     processLabel: 'Leads',
@@ -259,9 +311,9 @@ const summaryPanels: PanelConfig[] = [
   {
     id: 'pipeline',
     title: 'Pipeline Value',
-    chartType: 'revenue',
+    chartType: 'bar',
     size: { width: 3, height: 2 },
-    data: revenueData,
+    data: segmentSummary('pipeline'),
     semantic: { processStep: 2, segment: null, detailLevel: 1 },
     parentId: 'dashboard',
     processLabel: 'Pipeline',
@@ -269,9 +321,9 @@ const summaryPanels: PanelConfig[] = [
   {
     id: 'revenue',
     title: 'Closed Revenue',
-    chartType: 'kpi',
-    size: { width: 3.5, height: 2 },
-    data: kpiData,
+    chartType: 'bar',
+    size: { width: 3, height: 2 },
+    data: segmentSummary('revenue'),
     semantic: { processStep: 3, segment: null, detailLevel: 1 },
     parentId: 'dashboard',
     processLabel: 'Revenue',
@@ -279,9 +331,9 @@ const summaryPanels: PanelConfig[] = [
   {
     id: 'retention',
     title: 'Retention & Churn',
-    chartType: 'churn',
+    chartType: 'bar',
     size: { width: 3, height: 2 },
-    data: churnData,
+    data: segmentSummary('retention'),
     semantic: { processStep: 4, segment: null, detailLevel: 1 },
     parentId: 'dashboard',
     processLabel: 'Retention',

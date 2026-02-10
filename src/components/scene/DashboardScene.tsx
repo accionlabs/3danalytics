@@ -23,22 +23,35 @@ export function DashboardScene() {
     return map
   }, [panels, allPositions])
 
-  // For the root dashboard: map KPI item index → child panel ID (sorted by processStep)
-  const rootChildIds = useMemo(() => {
-    const root = panels.find((p) => !p.parentId)
-    if (!root) return []
-    return panels
-      .filter((p) => p.parentId === root.id)
-      .sort((a, b) => a.semantic.processStep - b.semantic.processStep)
-      .map((p) => p.id)
+  // Build map: parentId → sorted child panel IDs
+  const childMap = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const p of panels) {
+      if (!p.parentId) continue
+      const siblings = map.get(p.parentId) ?? []
+      siblings.push(p.id)
+      map.set(p.parentId, siblings)
+    }
+    // Sort children by processStep (X) for Z=0→Z=1, by segment (Y) for Z=1→Z=2
+    for (const [parentId, children] of map) {
+      const parent = panels.find((p) => p.id === parentId)
+      children.sort((a, b) => {
+        const pa = panels.find((p) => p.id === a)!
+        const pb = panels.find((p) => p.id === b)!
+        if (parent?.semantic.detailLevel === 0) return pa.semantic.processStep - pb.semantic.processStep
+        return (pa.semantic.segment ?? 0) - (pb.semantic.segment ?? 0)
+      })
+    }
+    return map
   }, [panels])
 
-  const handleDashboardItemClick = useCallback(
-    (index: number) => {
-      const childId = rootChildIds[index]
+  const handleItemClick = useCallback(
+    (panelId: string, index: number) => {
+      const children = childMap.get(panelId)
+      const childId = children?.[index]
       if (childId) focusPanel(childId)
     },
-    [rootChildIds, focusPanel],
+    [childMap, focusPanel],
   )
 
   return (
@@ -49,7 +62,6 @@ export function DashboardScene() {
       {panels.map((panel) => {
         const pos = positionMap.get(panel.id)
         if (!pos) return null
-        const isRoot = !panel.parentId
         return (
           <DashboardPanel
             key={panel.id}
@@ -57,7 +69,7 @@ export function DashboardScene() {
             target={pos}
             isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
             onFocus={() => focusPanel(panel.id)}
-            onItemClick={isRoot ? handleDashboardItemClick : undefined}
+            onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
           />
         )
       })}

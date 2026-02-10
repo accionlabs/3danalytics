@@ -43,6 +43,16 @@ describe('grammar mock data', () => {
     }
   })
 
+  it('Z=1 panels all have chartType bar with 3 segment items', () => {
+    const summaries = defaultPanels.filter((p) => p.semantic.detailLevel === 1)
+    for (const s of summaries) {
+      expect(s.chartType).toBe('bar')
+      const data = s.data as { product: string }[]
+      expect(data).toHaveLength(3)
+      expect(data.map((d) => d.product)).toEqual(['Startup', 'SMB', 'Enterprise'])
+    }
+  })
+
   it('has 15 Z=2 segment panels (3 segments x 5 steps)', () => {
     const details = defaultPanels.filter((p) => p.semantic.detailLevel === 2)
     expect(details).toHaveLength(15)

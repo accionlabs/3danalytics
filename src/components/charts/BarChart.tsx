@@ -13,7 +13,7 @@ import type { ProductRevenue } from '../../types/index.ts'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e']
 
-export function BarChart({ data, width, height }: ChartRendererProps) {
+export function BarChart({ data, width, height, onItemClick }: ChartRendererProps) {
   const products = data as ProductRevenue[]
   const fontSize = Math.max(10, Math.round(width * 0.024))
   const tooltipFontSize = Math.max(11, Math.round(width * 0.028))
@@ -37,6 +37,7 @@ export function BarChart({ data, width, height }: ChartRendererProps) {
           tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
         />
         <Tooltip
+          cursor={false}
           contentStyle={{
             background: '#0d1520',
             border: '1px solid #2a3a50',
@@ -50,9 +51,18 @@ export function BarChart({ data, width, height }: ChartRendererProps) {
             return [`$${v.toLocaleString()} (${p.growth > 0 ? '+' : ''}${p.growth}%)`, 'Revenue']
           }}
         />
-        <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+        <Bar
+          dataKey="revenue"
+          radius={[4, 4, 0, 0]}
+          activeBar={false}
+          onClick={onItemClick ? (_data, index, e) => { e.stopPropagation(); onItemClick(index) } : undefined}
+        >
           {products.map((_, i) => (
-            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+            <Cell
+              key={i}
+              fill={COLORS[i % COLORS.length]}
+              cursor={onItemClick ? 'pointer' : undefined}
+            />
           ))}
         </Bar>
       </RechartsBarChart>
