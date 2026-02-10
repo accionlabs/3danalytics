@@ -2,6 +2,7 @@ import { useRef, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
+import { findNeighbor } from '../../hooks/useKeyboardNavigation.ts'
 
 /**
  * Camera controller using R3F's useFrame for animation.
@@ -63,13 +64,41 @@ export function CameraController() {
     prevFocusedRef.current = focusedPanelId
   }, [cameraTarget, focusedPanelId])
 
-  // Scroll wheel zoom — listen on window so it works even over Html overlays
+  // Scroll: vertical = zoom, horizontal = X-axis navigation (trackpad/Apple mouse)
   useEffect(() => {
     const forward = new THREE.Vector3()
+    let accumulatedDeltaX = 0
+    const SWIPE_THRESHOLD = 80 // px of accumulated horizontal scroll to trigger nav
+    let swipeCooldown = false
+
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
+
+      // Horizontal scroll → X-axis navigation
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 2) {
+        if (swipeCooldown) return
+        accumulatedDeltaX += e.deltaX
+        if (Math.abs(accumulatedDeltaX) >= SWIPE_THRESHOLD) {
+          const direction = accumulatedDeltaX > 0 ? 1 : -1
+          const { focusedPanelId, panels: currentPanels } = useDashboardStore.getState()
+          const current = currentPanels.find((p) => p.id === focusedPanelId)
+          if (current) {
+            const neighbor = findNeighbor(currentPanels, current, 'x', direction as 1 | -1)
+            if (neighbor) {
+              useDashboardStore.getState().navigateTo(neighbor.id, 'x')
+              swipeCooldown = true
+              setTimeout(() => { swipeCooldown = false }, 400)
+            }
+          }
+          accumulatedDeltaX = 0
+        }
+        return
+      }
+
+      // Vertical scroll → zoom
       forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
       targetPos.current.addScaledVector(forward, -e.deltaY * 0.01 * 0.5)
+      accumulatedDeltaX = 0 // reset horizontal accumulator on vertical scroll
     }
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
