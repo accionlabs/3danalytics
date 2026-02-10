@@ -64,41 +64,63 @@ export function CameraController() {
     prevFocusedRef.current = focusedPanelId
   }, [cameraTarget, focusedPanelId])
 
-  // Scroll: vertical = zoom, horizontal = X-axis navigation (trackpad/Apple mouse)
+  // Scroll: Ctrl/Cmd+scroll = zoom, horizontal = X-axis, vertical = Y-axis
   useEffect(() => {
     const forward = new THREE.Vector3()
     let accumulatedDeltaX = 0
-    const SWIPE_THRESHOLD = 80 // px of accumulated horizontal scroll to trigger nav
-    let swipeCooldown = false
+    let accumulatedDeltaY = 0
+    const SWIPE_THRESHOLD = 80
+    let swipeCooldownX = false
+    let swipeCooldownY = false
+
+    const navigateAxis = (axis: 'x' | 'y', direction: 1 | -1) => {
+      const { focusedPanelId, panels: currentPanels } = useDashboardStore.getState()
+      const current = currentPanels.find((p) => p.id === focusedPanelId)
+      if (!current) return
+      const neighbor = findNeighbor(currentPanels, current, axis, direction)
+      if (neighbor) useDashboardStore.getState().navigateTo(neighbor.id, axis)
+    }
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
 
-      // Horizontal scroll → X-axis navigation
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 2) {
-        if (swipeCooldown) return
-        accumulatedDeltaX += e.deltaX
-        if (Math.abs(accumulatedDeltaX) >= SWIPE_THRESHOLD) {
-          const direction = accumulatedDeltaX > 0 ? 1 : -1
-          const { focusedPanelId, panels: currentPanels } = useDashboardStore.getState()
-          const current = currentPanels.find((p) => p.id === focusedPanelId)
-          if (current) {
-            const neighbor = findNeighbor(currentPanels, current, 'x', direction as 1 | -1)
-            if (neighbor) {
-              useDashboardStore.getState().navigateTo(neighbor.id, 'x')
-              swipeCooldown = true
-              setTimeout(() => { swipeCooldown = false }, 400)
-            }
-          }
-          accumulatedDeltaX = 0
-        }
+      // Ctrl/Cmd + scroll → zoom
+      if (e.ctrlKey || e.metaKey) {
+        forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
+        targetPos.current.addScaledVector(forward, -e.deltaY * 0.01 * 0.5)
         return
       }
 
-      // Vertical scroll → zoom
-      forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
-      targetPos.current.addScaledVector(forward, -e.deltaY * 0.01 * 0.5)
-      accumulatedDeltaX = 0 // reset horizontal accumulator on vertical scroll
+      // Horizontal scroll → X-axis navigation
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 2) {
+        if (swipeCooldownX) return
+        accumulatedDeltaX += e.deltaX
+        if (Math.abs(accumulatedDeltaX) >= SWIPE_THRESHOLD) {
+          const direction = accumulatedDeltaX > 0 ? 1 : -1
+          navigateAxis('x', direction as 1 | -1)
+          swipeCooldownX = true
+          setTimeout(() => { swipeCooldownX = false }, 400)
+          accumulatedDeltaX = 0
+        }
+        accumulatedDeltaY = 0
+        return
+      }
+
+      // Vertical scroll → Y-axis navigation
+      if (Math.abs(e.deltaY) > 2) {
+        if (swipeCooldownY) return
+        accumulatedDeltaY += e.deltaY
+        if (Math.abs(accumulatedDeltaY) >= SWIPE_THRESHOLD) {
+          // Scroll down = negative Y direction, scroll up = positive Y direction
+          const direction = accumulatedDeltaY > 0 ? -1 : 1
+          navigateAxis('y', direction as 1 | -1)
+          swipeCooldownY = true
+          setTimeout(() => { swipeCooldownY = false }, 400)
+          accumulatedDeltaY = 0
+        }
+        accumulatedDeltaX = 0
+        return
+      }
     }
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
