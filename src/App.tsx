@@ -47,7 +47,7 @@ export default function App() {
       style={{
         position: 'relative',
         width: '100vw',
-        height: '100vh',
+        height: '100dvh',
         background: '#0a0a1a',
       }}
     >
