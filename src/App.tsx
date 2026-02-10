@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { DashboardScene } from './components/scene/DashboardScene.tsx'
 import { Navbar } from './components/ui/Navbar.tsx'
@@ -9,15 +9,32 @@ import { defaultPanels } from './data/mockData.ts'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation.ts'
 import { AxisIndicators } from './components/ui/AxisIndicators.tsx'
 import { NavigationHelper } from './components/ui/NavigationHelper.tsx'
+import { HelpPopup } from './components/ui/HelpPopup.tsx'
 
 export default function App() {
   const setPanels = useDashboardStore((s) => s.setPanels)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   useKeyboardNavigation()
 
   useEffect(() => {
     setPanels(defaultPanels)
   }, [setPanels])
+
+  const toggleHelp = useCallback(() => setHelpOpen((v) => !v), [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === '?') {
+        e.preventDefault()
+        toggleHelp()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [toggleHelp])
 
   return (
     <div
@@ -39,7 +56,7 @@ export default function App() {
         </Canvas>
       </Suspense>
 
-      <Navbar />
+      <Navbar onHelpClick={toggleHelp} />
       <div
         style={{
           position: 'absolute',
@@ -60,6 +77,7 @@ export default function App() {
         <NavigationHelper />
       </div>
       <AxisIndicators />
+      <HelpPopup open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }

@@ -1,4 +1,8 @@
-export function Navbar() {
+interface NavbarProps {
+  onHelpClick?: () => void
+}
+
+export function Navbar({ onHelpClick }: NavbarProps) {
   return (
     <nav
       style={{
@@ -9,6 +13,7 @@ export function Navbar() {
         height: 48,
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'space-between',
         padding: '0 20px',
         background: 'rgba(10, 10, 26, 0.6)',
         backdropFilter: 'blur(12px)',
@@ -26,6 +31,23 @@ export function Navbar() {
       >
         3D Analytics
       </div>
+      {onHelpClick && (
+        <button
+          onClick={onHelpClick}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#60a5fa',
+            fontSize: 16,
+            cursor: 'pointer',
+            padding: '4px 8px',
+            fontWeight: 700,
+          }}
+          title="Navigation help (?)"
+        >
+          ?
+        </button>
+      )}
     </nav>
   )
 }
