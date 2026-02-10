@@ -12,6 +12,7 @@ export function DashboardScene() {
   const panels = useDashboardStore((s) => s.panels)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
+  const navigateBack = useDashboardStore((s) => s.navigateBack)
 
   // Compute positions for ALL panels
   const allPositions = useMemo(() => grammarLayout(panels), [panels])
@@ -85,6 +86,7 @@ export function DashboardScene() {
             isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
             onFocus={() => handlePanelClick(panel.id)}
             onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
+            onDrillOut={panel.parentId ? navigateBack : undefined}
           />
         )
       })}
