@@ -91,12 +91,16 @@ export function CameraController() {
     const up = new THREE.Vector3()
     const forward = new THREE.Vector3()
 
+    let pointerId = -1
+
     const handlePointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return // left button only
       isDown = true
       didDrag = false
       startX = e.clientX
       startY = e.clientY
+      pointerId = e.pointerId
+      canvas.setPointerCapture(e.pointerId)
     }
 
     const handlePointerMove = (e: PointerEvent) => {
@@ -130,20 +134,35 @@ export function CameraController() {
     }
 
     const handlePointerUp = () => {
-      if (isDown && didDrag) {
+      if (!isDown) return
+      if (didDrag) {
         // Clear dragging flag after a tick so onPointerMissed sees it
         setTimeout(() => setDragging(false), 50)
       }
       isDown = false
+      if (pointerId >= 0) {
+        canvas.releasePointerCapture(pointerId)
+        pointerId = -1
+      }
+    }
+
+    const handlePointerCancel = () => {
+      isDown = false
+      pointerId = -1
+      setDragging(false)
     }
 
     canvas.addEventListener('pointerdown', handlePointerDown)
     canvas.addEventListener('pointermove', handlePointerMove)
     canvas.addEventListener('pointerup', handlePointerUp)
+    canvas.addEventListener('pointercancel', handlePointerCancel)
+    canvas.addEventListener('lostpointercapture', handlePointerCancel)
     return () => {
       canvas.removeEventListener('pointerdown', handlePointerDown)
       canvas.removeEventListener('pointermove', handlePointerMove)
       canvas.removeEventListener('pointerup', handlePointerUp)
+      canvas.removeEventListener('pointercancel', handlePointerCancel)
+      canvas.removeEventListener('lostpointercapture', handlePointerCancel)
     }
   }, [gl, setDragging])
 
