@@ -350,9 +350,9 @@ export function CameraController() {
     const onStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
         const t = e.touches[0]
-        // Ignore touches on UI chrome (nav, buttons, bottom bar)
+        // Ignore touches on UI chrome (nav, bottom bar)
         const el = t.target as HTMLElement
-        if (el.closest('nav, button, [data-chrome]')) return
+        if (el.closest('nav')) return
         touchId = t.identifier
         prevX = t.clientX
         prevY = t.clientY
@@ -362,7 +362,8 @@ export function CameraController() {
         accY = 0
         didMove = false
       } else if (e.touches.length === 2) {
-        // Switch to two-finger mode
+        // Switch to two-finger mode — prevent browser pinch-to-zoom
+        e.preventDefault()
         touchId = -1
         prevPinchDist = touchDist(e.touches[0], e.touches[1])
         const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
@@ -394,6 +395,8 @@ export function CameraController() {
       if (e.touches.length !== 1 || touchId === -1) return
       const t = Array.from(e.touches).find((tt) => tt.identifier === touchId)
       if (!t) return
+
+      e.preventDefault() // prevent browser scroll/rubber-band
 
       const dx = t.clientX - prevX
       const dy = t.clientY - prevY
@@ -473,7 +476,7 @@ export function CameraController() {
       }
     }
 
-    window.addEventListener('touchstart', onStart, { passive: true })
+    window.addEventListener('touchstart', onStart, { passive: false })
     window.addEventListener('touchmove', onMove, { passive: false })
     window.addEventListener('touchend', onEnd, { passive: true })
     return () => {

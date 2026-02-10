@@ -94,6 +94,7 @@ export function DashboardPanel({
             overflow: 'hidden',
             fontFamily: 'system-ui, sans-serif',
             cursor: 'pointer',
+            touchAction: 'none',
           }}
         >
           {/* Dim overlay for non-focused panels */}
