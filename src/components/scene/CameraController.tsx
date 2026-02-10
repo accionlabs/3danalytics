@@ -249,8 +249,6 @@ export function CameraController() {
     const canvas = gl.domElement
     const DRAG_THRESHOLD = 5 // px — distinguishes click from drag
     const PAN_SPEED = 0.005
-    const SWIPE_MAX_DURATION = 300 // ms
-    const SWIPE_MIN_DISTANCE = 50 // px
 
     const right = new THREE.Vector3()
     const up = new THREE.Vector3()
@@ -263,10 +261,17 @@ export function CameraController() {
     let primaryId = -1
     let startX = 0
     let startY = 0
-    let startTime = 0
     let didDrag = false
     let prevX = 0
     let prevY = 0
+    let isTouchPointer = false
+
+    // Touch scroll navigation state (accumulated delta, like wheel handler)
+    let accTouchX = 0
+    let accTouchY = 0
+    const TOUCH_SCROLL_THRESHOLD = 60 // px
+    let touchCooldownX = false
+    let touchCooldownY = false
 
     // Pinch state
     let prevPinchDist = 0
@@ -301,10 +306,12 @@ export function CameraController() {
         primaryId = e.pointerId
         startX = e.clientX
         startY = e.clientY
-        startTime = Date.now()
         didDrag = false
         prevX = e.clientX
         prevY = e.clientY
+        isTouchPointer = e.pointerType === 'touch'
+        accTouchX = 0
+        accTouchY = 0
         canvas.setPointerCapture(e.pointerId)
       } else if (pointers.size === 2) {
         // Second pointer — switch to pinch/two-finger-swipe mode, cancel any drag
@@ -343,7 +350,7 @@ export function CameraController() {
 
       if (pointers.size !== 1 || e.pointerId !== primaryId) return
 
-      // Single pointer — pan (drag)
+      // Single pointer — behaviour differs between touch and mouse
       const dx = e.clientX - startX
       const dy = e.clientY - startY
 
@@ -359,19 +366,43 @@ export function CameraController() {
       prevX = e.clientX
       prevY = e.clientY
 
-      // Compute camera right and up vectors
-      forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
-      right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
-      up.crossVectors(right, forward).normalize()
+      if (isTouchPointer) {
+        // Touch: accumulated-delta scroll navigation (like wheel handler)
+        accTouchX += moveDx
+        accTouchY += moveDy
 
-      // Translate camera position and lookAt
-      const panX = -moveDx * PAN_SPEED
-      const panY = moveDy * PAN_SPEED
+        // Horizontal scroll → X-axis navigation
+        if (!touchCooldownX && Math.abs(accTouchX) > Math.abs(accTouchY) &&
+            Math.abs(accTouchX) >= TOUCH_SCROLL_THRESHOLD) {
+          navigateAxis('x', accTouchX > 0 ? -1 : 1)
+          touchCooldownX = true
+          setTimeout(() => { touchCooldownX = false }, 400)
+          accTouchX = 0
+          accTouchY = 0
+        }
+        // Vertical scroll → Y-axis navigation
+        if (!touchCooldownY && Math.abs(accTouchY) > Math.abs(accTouchX) &&
+            Math.abs(accTouchY) >= TOUCH_SCROLL_THRESHOLD) {
+          navigateAxis('y', accTouchY > 0 ? 1 : -1)
+          touchCooldownY = true
+          setTimeout(() => { touchCooldownY = false }, 400)
+          accTouchX = 0
+          accTouchY = 0
+        }
+      } else {
+        // Mouse: pan camera
+        forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
+        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize()
+        up.crossVectors(right, forward).normalize()
 
-      targetPos.current.addScaledVector(right, panX)
-      targetPos.current.addScaledVector(up, panY)
-      targetLookAt.current.addScaledVector(right, panX)
-      targetLookAt.current.addScaledVector(up, panY)
+        const panX = -moveDx * PAN_SPEED
+        const panY = moveDy * PAN_SPEED
+
+        targetPos.current.addScaledVector(right, panX)
+        targetPos.current.addScaledVector(up, panY)
+        targetLookAt.current.addScaledVector(right, panX)
+        targetLookAt.current.addScaledVector(up, panY)
+      }
     }
 
     const handlePointerUp = (e: PointerEvent) => {
@@ -397,22 +428,11 @@ export function CameraController() {
       }
 
       if (e.pointerId === primaryId) {
-        const elapsed = Date.now() - startTime
         const totalDx = e.clientX - startX
         const totalDy = e.clientY - startY
-        const totalDist = Math.hypot(totalDx, totalDy)
-
-        // Quick swipe detection: short duration + enough distance
-        if (elapsed < SWIPE_MAX_DURATION && totalDist > SWIPE_MIN_DISTANCE) {
-          if (Math.abs(totalDx) > Math.abs(totalDy)) {
-            navigateAxis('x', totalDx > 0 ? -1 : 1)
-          } else {
-            navigateAxis('y', totalDy > 0 ? 1 : -1)
-          }
-        }
 
         // Double-tap detection (drill out): two quick taps close together
-        if (!didDrag && totalDist < DRAG_THRESHOLD) {
+        if (!didDrag && Math.hypot(totalDx, totalDy) < DRAG_THRESHOLD) {
           const now = Date.now()
           if (now - lastTapTime < DOUBLE_TAP_INTERVAL &&
               Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < DOUBLE_TAP_DISTANCE) {
@@ -437,7 +457,6 @@ export function CameraController() {
         primaryId = id
         startX = pt.x
         startY = pt.y
-        startTime = Date.now()
         didDrag = false
         prevX = pt.x
         prevY = pt.y
