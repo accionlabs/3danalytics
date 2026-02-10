@@ -52,7 +52,7 @@ export default function App() {
           backdropFilter: 'blur(12px)',
           borderRadius: 8,
           border: '1px solid rgba(60, 80, 120, 0.2)',
-          zIndex: 100,
+          zIndex: 10000,
           maxWidth: 'calc(100vw - 40px)',
         }}
       >

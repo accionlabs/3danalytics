@@ -13,7 +13,7 @@ export function Navbar() {
         background: 'rgba(10, 10, 26, 0.6)',
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(60, 80, 120, 0.2)',
-        zIndex: 100,
+        zIndex: 10000,
       }}
     >
       <div

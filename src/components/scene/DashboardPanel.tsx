@@ -60,7 +60,7 @@ export function DashboardPanel({
         distanceFactor={DISTANCE_FACTOR}
         position={[0, 0, 0.01]}
         center
-        zIndexRange={[10000, 0]}
+        zIndexRange={[9000, 0]}
         style={{ pointerEvents: 'auto' }}
       >
         <div

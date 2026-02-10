@@ -38,7 +38,7 @@ export function AxisIndicators() {
     fontSize: 11,
     fontWeight: 600,
     letterSpacing: '0.5px',
-    zIndex: 90,
+    zIndex: 10000,
     transition: 'opacity 0.4s ease',
     opacity: visible ? 0.8 : 0,
     pointerEvents: 'none',
