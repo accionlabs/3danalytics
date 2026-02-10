@@ -63,18 +63,17 @@ export function CameraController() {
     prevFocusedRef.current = focusedPanelId
   }, [cameraTarget, focusedPanelId])
 
-  // Scroll wheel zoom — modifies target, picked up by useFrame below
+  // Scroll wheel zoom — listen on window so it works even over Html overlays
   useEffect(() => {
-    const canvas = gl.domElement
     const forward = new THREE.Vector3()
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
       forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
       targetPos.current.addScaledVector(forward, -e.deltaY * 0.01 * 0.5)
     }
-    canvas.addEventListener('wheel', handleWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', handleWheel)
-  }, [gl])
+    window.addEventListener('wheel', handleWheel, { passive: false })
+    return () => window.removeEventListener('wheel', handleWheel)
+  }, [])
 
   // Left-click drag to pan — translates camera along right/up axes
   useEffect(() => {
