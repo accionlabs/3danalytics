@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
+import { useViewport } from '../../hooks/useViewport.ts'
 
 export function AxisIndicators() {
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const panels = useDashboardStore((s) => s.panels)
   const navigation = useDashboardStore((s) => s.navigation)
+  const { uiScale } = useViewport()
 
   const [visible, setVisible] = useState(false)
   const fadeTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -29,6 +31,11 @@ export function AxisIndicators() {
   // Max detail level in the dataset
   const maxDepth = Math.max(...panels.map((p) => p.semantic.detailLevel))
 
+  // Offsets computed from scaled chrome: navbar = 48*uiScale, bottom bar ≈ 36*uiScale at pos 12
+  const topOffset = Math.round(48 * uiScale + 8)
+  const rightOffset = 16
+  const bottomOffset = Math.round(36 * uiScale + 8)
+
   const baseStyle: React.CSSProperties = {
     position: 'absolute',
     padding: '6px 14px',
@@ -50,9 +57,9 @@ export function AxisIndicators() {
       <div
         style={{
           ...baseStyle,
-          top: 56,
+          top: topOffset,
           left: '50%',
-          transform: 'translateX(-50%)',
+          transform: `translateX(-50%) scale(${uiScale})`,
           color: '#3b82f6',
         }}
       >
@@ -63,9 +70,9 @@ export function AxisIndicators() {
       <div
         style={{
           ...baseStyle,
-          right: 16,
+          right: rightOffset,
           top: '50%',
-          transform: 'translateY(-50%)',
+          transform: `translateY(-50%) scale(${uiScale})`,
           color: '#10b981',
           writingMode: 'vertical-rl',
           textOrientation: 'mixed',
@@ -78,9 +85,9 @@ export function AxisIndicators() {
       <div
         style={{
           ...baseStyle,
-          bottom: 60,
+          bottom: bottomOffset,
           left: '50%',
-          transform: 'translateX(-50%)',
+          transform: `translateX(-50%) scale(${uiScale})`,
           color: '#f59e0b',
         }}
       >

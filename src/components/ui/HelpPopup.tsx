@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useViewport } from '../../hooks/useViewport.ts'
 
 interface HelpPopupProps {
   open: boolean
@@ -40,6 +41,9 @@ function Row({ keys, action }: { keys: string; action: string }) {
 }
 
 export function HelpPopup({ open, onClose }: HelpPopupProps) {
+  const { isMobile, isTablet } = useViewport()
+  const isCompact = isMobile || isTablet
+
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -75,8 +79,9 @@ export function HelpPopup({ open, onClose }: HelpPopupProps) {
           borderRadius: 10,
           maxWidth: 520,
           width: '90vw',
-          padding: '20px 24px',
+          padding: isCompact ? '14px 16px' : '20px 24px',
           position: 'relative',
+          ...(isCompact ? { maxHeight: '80vh', overflowY: 'auto' as const } : {}),
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -126,6 +131,19 @@ export function HelpPopup({ open, onClose }: HelpPopupProps) {
         <Row keys="Horizontal scroll" action="Navigate pipeline stages (X)" />
         <Row keys="Vertical scroll" action="Navigate segments (Y)" />
         <Row keys="Ctrl/Cmd + scroll" action="Zoom in/out" />
+
+        {isCompact && (
+          <>
+            <div style={sectionHeader}>Touch Gestures</div>
+            <Row keys="Tap panel" action="Focus / drill into panel" />
+            <Row keys="Double tap" action="Drill out to parent" />
+            <Row keys="Two-finger tap" action="Drill out to parent" />
+            <Row keys="Swipe left / right" action="Navigate pipeline stages (X)" />
+            <Row keys="Swipe up / down" action="Navigate segments (Y)" />
+            <Row keys="Pinch in / out" action="Zoom camera" />
+            <Row keys="One-finger drag" action="Pan camera" />
+          </>
+        )}
       </div>
     </div>
   )

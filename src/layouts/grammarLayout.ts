@@ -2,7 +2,7 @@ import type { PanelConfig, PanelPosition } from '../types/index.ts'
 
 const X_SPACING = 4
 const Y_SPACING = 3
-const Z_SPACING = 4
+export const Z_SPACING = 4
 const Z_BASE = -8
 
 /**

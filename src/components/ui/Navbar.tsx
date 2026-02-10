@@ -1,15 +1,19 @@
+import { useViewport } from '../../hooks/useViewport.ts'
+
 interface NavbarProps {
   onHelpClick?: () => void
 }
 
 export function Navbar({ onHelpClick }: NavbarProps) {
+  const { uiScale } = useViewport()
+
   return (
     <nav
       style={{
         position: 'absolute',
         top: 0,
         left: 0,
-        right: 0,
+        width: `${100 / uiScale}%`,
         height: 48,
         display: 'flex',
         alignItems: 'center',
@@ -19,6 +23,8 @@ export function Navbar({ onHelpClick }: NavbarProps) {
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(60, 80, 120, 0.2)',
         zIndex: 10000,
+        transform: `scale(${uiScale})`,
+        transformOrigin: 'top left',
       }}
     >
       <div

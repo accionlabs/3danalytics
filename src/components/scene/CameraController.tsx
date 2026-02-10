@@ -1,8 +1,67 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
 import { findNeighbor } from '../../hooks/useKeyboardNavigation.ts'
+import { Z_SPACING } from '../../layouts/grammarLayout.ts'
+
+/** Target fraction of usable viewport the focused panel should fill */
+export const TARGET_FILL = 0.85
+/** The fixed camera offset used by cameraForPanel in the store */
+const BASE_OFFSET = 3
+/** Reference desktop heights for chrome (before CSS scaling) */
+const NAVBAR_REF_HEIGHT = 48
+const BOTTOM_BAR_REF_HEIGHT = 36
+/** Horizontal breathing room per side */
+const CHROME_SIDE = 16
+/** uiScale formula — must match useViewport.ts */
+function computeUiScale(viewportWidth: number): number {
+  return Math.min(1, Math.max(0.65, viewportWidth / 1200))
+}
+/** Max camera offset before nearer Z-layer panels occlude the focused panel.
+ *  Must be < Z_SPACING so the camera stays behind the layer in front. */
+const MAX_OFFSET = Z_SPACING - 0.5
+
+/**
+ * Compute the ideal camera distance so the focused panel fills ~85% of the
+ * **usable** viewport (after subtracting Navbar and breadcrumb bar).
+ * Returns the raw distance in world units (not divided by BASE_OFFSET).
+ */
+export function fitIdealDistance(
+  panelWidth: number,
+  panelHeight: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  fov: number,
+): number {
+  const scale = computeUiScale(canvasWidth)
+  const usableW = canvasWidth - 2 * CHROME_SIDE
+  const usableH = canvasHeight - NAVBAR_REF_HEIGHT * scale - BOTTOM_BAR_REF_HEIGHT * scale
+  const aspect = canvasWidth / canvasHeight
+  const tanHalf = Math.tan((fov * Math.PI / 180) / 2)
+
+  const hFrac = usableW / canvasWidth
+  const vFrac = usableH / canvasHeight
+
+  const dForWidth = panelWidth / (2 * TARGET_FILL * tanHalf * aspect * hFrac)
+  const dForHeight = panelHeight / (2 * TARGET_FILL * tanHalf * vFrac)
+
+  return Math.max(dForWidth, dForHeight)
+}
+
+/** Apply distance multiplier to a camera position relative to a lookAt point */
+function applyDistMult(
+  pos: [number, number, number],
+  lookAt: [number, number, number],
+  mult: number,
+): THREE.Vector3 {
+  const result = new THREE.Vector3(...pos)
+  if (mult === 1.0) return result
+  const target = new THREE.Vector3(...lookAt)
+  const offset = result.clone().sub(target)
+  offset.multiplyScalar(mult)
+  return target.add(offset)
+}
 
 /**
  * Camera controller using R3F's useFrame for animation.
@@ -25,44 +84,111 @@ export function CameraController() {
   const savedOverviewPos = useRef(new THREE.Vector3(...cameraTarget.position))
   const savedOverviewLookAt = useRef(new THREE.Vector3(...cameraTarget.lookAt))
   const prevFocusedRef = useRef<string | null>(null)
+  // Track the last aspect multiplier so we can re-adjust on resize
+  const lastMultRef = useRef(1.0)
 
-  const { gl } = useThree()
+  const { gl, camera: threeCamera } = useThree()
 
-  // Set initial position immediately
+  /** Look up the focused panel and compute the capped camera distance multiplier.
+   *  For panels at Z>0, caps the offset at MAX_OFFSET so the camera stays
+   *  behind the nearer Z layer and doesn't let it occlude the focused panel. */
+  const getFitMult = useCallback((panelId: string | null): number => {
+    if (!panelId) return 1.0
+    const panel = useDashboardStore.getState().panels.find((p) => p.id === panelId)
+    if (!panel) return 1.0
+    const canvas = gl.domElement
+    const fov = (threeCamera as THREE.PerspectiveCamera).fov
+    const idealDist = fitIdealDistance(panel.size.width, panel.size.height, canvas.clientWidth, canvas.clientHeight, fov)
+    // Z=0 panels have nothing in front — no cap needed
+    const maxDist = panel.semantic.detailLevel > 0 ? MAX_OFFSET : idealDist
+    return Math.min(idealDist, maxDist) / BASE_OFFSET
+  }, [gl, threeCamera])
+
+  // Set initial position immediately, with fit-to-panel multiplier
   useEffect(() => {
-    currentPos.current.set(...cameraTarget.position)
+    const { focusedPanelId: initFocus } = useDashboardStore.getState()
+    const mult = getFitMult(initFocus)
+    lastMultRef.current = mult
+    const adjusted = applyDistMult(cameraTarget.position, cameraTarget.lookAt, mult)
+    currentPos.current.copy(adjusted)
     currentLookAt.current.set(...cameraTarget.lookAt)
-    targetPos.current.set(...cameraTarget.position)
+    targetPos.current.copy(adjusted)
     targetLookAt.current.set(...cameraTarget.lookAt)
-    savedOverviewPos.current.set(...cameraTarget.position)
+    savedOverviewPos.current.copy(adjusted)
     savedOverviewLookAt.current.set(...cameraTarget.lookAt)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Handle transitions between overview ↔ focused, preserving zoom level
+  // Re-adjust camera distance when viewport is resized
+  useEffect(() => {
+    let rafId = 0
+    const handleResize = () => {
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        const { focusedPanelId: fId } = useDashboardStore.getState()
+        const newMult = getFitMult(fId)
+        const oldMult = lastMultRef.current
+        if (Math.abs(newMult - oldMult) < 0.001) return
+        lastMultRef.current = newMult
+
+        // Scale the current camera-to-lookAt distance by newMult/oldMult
+        const ratio = newMult / oldMult
+        const offset = targetPos.current.clone().sub(targetLookAt.current)
+        offset.multiplyScalar(ratio)
+        targetPos.current.copy(targetLookAt.current).add(offset)
+      })
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      cancelAnimationFrame(rafId)
+    }
+  }, [getFitMult])
+
+  // Handle transitions between overview ↔ focused, fitting panel to viewport
   useEffect(() => {
     const wasFocused = prevFocusedRef.current !== null
     const isFocused = focusedPanelId !== null
+    const mult = getFitMult(focusedPanelId)
+    lastMultRef.current = mult
 
     if (!wasFocused && isFocused) {
       // Overview → Focused: save current (possibly scroll-zoomed) overview position
       savedOverviewPos.current.copy(targetPos.current)
       savedOverviewLookAt.current.copy(targetLookAt.current)
-      // Animate to the focused panel
-      targetPos.current.set(...cameraTarget.position)
+
+      targetPos.current.copy(applyDistMult(cameraTarget.position, cameraTarget.lookAt, mult))
       targetLookAt.current.set(...cameraTarget.lookAt)
     } else if (wasFocused && !isFocused) {
       // Focused → Overview: restore saved overview position (with zoom)
       targetPos.current.copy(savedOverviewPos.current)
       targetLookAt.current.copy(savedOverviewLookAt.current)
+    } else if (isFocused) {
+      // Different panel focus — fit new panel to viewport
+      targetPos.current.copy(applyDistMult(cameraTarget.position, cameraTarget.lookAt, mult))
+      targetLookAt.current.set(...cameraTarget.lookAt)
     } else {
-      // Same focus state (layout change, different panel focus, etc.)
-      targetPos.current.set(...cameraTarget.position)
+      // Overview layout change
+      targetPos.current.copy(applyDistMult(cameraTarget.position, cameraTarget.lookAt, mult))
       targetLookAt.current.set(...cameraTarget.lookAt)
     }
 
     prevFocusedRef.current = focusedPanelId
-  }, [cameraTarget, focusedPanelId])
+  }, [cameraTarget, focusedPanelId, getFitMult])
+
+  // Shared axis navigation — used by wheel, single-finger swipe (X/Y), and two-finger swipe (Z)
+  const navigateAxis = useCallback((axis: 'x' | 'y' | 'z', direction: 1 | -1) => {
+    const state = useDashboardStore.getState()
+    const current = state.panels.find((p) => p.id === state.focusedPanelId)
+    if (!current) return
+    // Drill out: use navigateBack (follows history) rather than findNeighbor
+    if (axis === 'z' && direction === -1) {
+      state.navigateBack()
+      return
+    }
+    const neighbor = findNeighbor(state.panels, current, axis, direction)
+    if (neighbor) state.navigateTo(neighbor.id, axis)
+  }, [])
 
   // Scroll: Ctrl/Cmd+scroll = zoom, horizontal = X-axis, vertical = Y-axis
   useEffect(() => {
@@ -72,14 +198,6 @@ export function CameraController() {
     const SWIPE_THRESHOLD = 80
     let swipeCooldownX = false
     let swipeCooldownY = false
-
-    const navigateAxis = (axis: 'x' | 'y', direction: 1 | -1) => {
-      const { focusedPanelId, panels: currentPanels } = useDashboardStore.getState()
-      const current = currentPanels.find((p) => p.id === focusedPanelId)
-      if (!current) return
-      const neighbor = findNeighbor(currentPanels, current, axis, direction)
-      if (neighbor) useDashboardStore.getState().navigateTo(neighbor.id, axis)
-    }
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
@@ -124,37 +242,108 @@ export function CameraController() {
     }
     window.addEventListener('wheel', handleWheel, { passive: false })
     return () => window.removeEventListener('wheel', handleWheel)
-  }, [])
+  }, [navigateAxis])
 
-  // Left-click drag to pan — translates camera along right/up axes
+  // Multi-pointer handler: single-finger drag/swipe + pinch-to-zoom
   useEffect(() => {
     const canvas = gl.domElement
     const DRAG_THRESHOLD = 5 // px — distinguishes click from drag
     const PAN_SPEED = 0.005
-
-    let isDown = false
-    let startX = 0
-    let startY = 0
-    let didDrag = false
+    const SWIPE_MAX_DURATION = 300 // ms
+    const SWIPE_MIN_DISTANCE = 50 // px
 
     const right = new THREE.Vector3()
     const up = new THREE.Vector3()
     const forward = new THREE.Vector3()
 
-    let pointerId = -1
+    // Track all active pointers
+    const pointers = new Map<number, { x: number; y: number }>()
+
+    // Single-pointer state
+    let primaryId = -1
+    let startX = 0
+    let startY = 0
+    let startTime = 0
+    let didDrag = false
+    let prevX = 0
+    let prevY = 0
+
+    // Pinch state
+    let prevPinchDist = 0
+
+    // Two-finger tap state (drill out)
+    let twoFingerStartCenter = { x: 0, y: 0 }
+    let twoFingerLastCenter = { x: 0, y: 0 }
+    let twoFingerStartTime = 0
+    const TWO_FINGER_TAP_MAX_DURATION = 400 // ms
+    const TWO_FINGER_TAP_MAX_MOVE = 20 // px — center movement threshold
+
+    // Double-tap state (drill out)
+    let lastTapTime = 0
+    let lastTapX = 0
+    let lastTapY = 0
+    const DOUBLE_TAP_INTERVAL = 350 // ms
+    const DOUBLE_TAP_DISTANCE = 30 // px
+
+    function getPointerDistance(): number {
+      const pts = Array.from(pointers.values())
+      if (pts.length < 2) return 0
+      const dx = pts[1].x - pts[0].x
+      const dy = pts[1].y - pts[0].y
+      return Math.hypot(dx, dy)
+    }
 
     const handlePointerDown = (e: PointerEvent) => {
-      if (e.button !== 0) return // left button only
-      isDown = true
-      didDrag = false
-      startX = e.clientX
-      startY = e.clientY
-      pointerId = e.pointerId
-      canvas.setPointerCapture(e.pointerId)
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      if (pointers.size === 1) {
+        // First pointer — start tracking for drag/swipe
+        primaryId = e.pointerId
+        startX = e.clientX
+        startY = e.clientY
+        startTime = Date.now()
+        didDrag = false
+        prevX = e.clientX
+        prevY = e.clientY
+        canvas.setPointerCapture(e.pointerId)
+      } else if (pointers.size === 2) {
+        // Second pointer — switch to pinch/two-finger-swipe mode, cancel any drag
+        prevPinchDist = getPointerDistance()
+        const pts = Array.from(pointers.values())
+        twoFingerStartCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+        twoFingerLastCenter = { ...twoFingerStartCenter }
+        twoFingerStartTime = Date.now()
+        if (didDrag) {
+          didDrag = false
+          setDragging(false)
+        }
+      }
     }
 
     const handlePointerMove = (e: PointerEvent) => {
-      if (!isDown) return
+      const ptr = pointers.get(e.pointerId)
+      if (!ptr) return
+      ptr.x = e.clientX
+      ptr.y = e.clientY
+
+      if (pointers.size === 2) {
+        // Pinch-to-zoom
+        const dist = getPointerDistance()
+        if (prevPinchDist > 0) {
+          const delta = dist - prevPinchDist
+          forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
+          targetPos.current.addScaledVector(forward, delta * 0.005)
+        }
+        prevPinchDist = dist
+        // Track center for two-finger swipe detection
+        const pts = Array.from(pointers.values())
+        twoFingerLastCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+        return
+      }
+
+      if (pointers.size !== 1 || e.pointerId !== primaryId) return
+
+      // Single pointer — pan (drag)
       const dx = e.clientX - startX
       const dy = e.clientY - startY
 
@@ -165,8 +354,10 @@ export function CameraController() {
         setDragging(true)
       }
 
-      const moveDx = e.movementX
-      const moveDy = e.movementY
+      const moveDx = e.clientX - prevX
+      const moveDy = e.clientY - prevY
+      prevX = e.clientX
+      prevY = e.clientY
 
       // Compute camera right and up vectors
       forward.copy(currentLookAt.current).sub(currentPos.current).normalize()
@@ -183,23 +374,83 @@ export function CameraController() {
       targetLookAt.current.addScaledVector(up, panY)
     }
 
-    const handlePointerUp = () => {
-      if (!isDown) return
-      if (didDrag) {
-        // Clear dragging flag after a tick so onPointerMissed sees it
-        setTimeout(() => setDragging(false), 50)
+    const handlePointerUp = (e: PointerEvent) => {
+      const wasInPointers = pointers.has(e.pointerId)
+      pointers.delete(e.pointerId)
+
+      if (!wasInPointers) return
+
+      // Release capture
+      try { canvas.releasePointerCapture(e.pointerId) } catch { /* already released */ }
+
+      // Detect two-finger tap (drill out): brief touch with minimal center movement
+      // Check before single-pointer handling, when going from 2 pointers to fewer
+      if (pointers.size <= 1 && prevPinchDist > 0) {
+        const elapsed = Date.now() - twoFingerStartTime
+        const centerDist = Math.hypot(
+          twoFingerLastCenter.x - twoFingerStartCenter.x,
+          twoFingerLastCenter.y - twoFingerStartCenter.y,
+        )
+        if (elapsed < TWO_FINGER_TAP_MAX_DURATION && centerDist < TWO_FINGER_TAP_MAX_MOVE) {
+          navigateAxis('z', -1)
+        }
       }
-      isDown = false
-      if (pointerId >= 0) {
-        canvas.releasePointerCapture(pointerId)
-        pointerId = -1
+
+      if (e.pointerId === primaryId) {
+        const elapsed = Date.now() - startTime
+        const totalDx = e.clientX - startX
+        const totalDy = e.clientY - startY
+        const totalDist = Math.hypot(totalDx, totalDy)
+
+        // Quick swipe detection: short duration + enough distance
+        if (elapsed < SWIPE_MAX_DURATION && totalDist > SWIPE_MIN_DISTANCE) {
+          if (Math.abs(totalDx) > Math.abs(totalDy)) {
+            navigateAxis('x', totalDx > 0 ? -1 : 1)
+          } else {
+            navigateAxis('y', totalDy > 0 ? 1 : -1)
+          }
+        }
+
+        // Double-tap detection (drill out): two quick taps close together
+        if (!didDrag && totalDist < DRAG_THRESHOLD) {
+          const now = Date.now()
+          if (now - lastTapTime < DOUBLE_TAP_INTERVAL &&
+              Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < DOUBLE_TAP_DISTANCE) {
+            navigateAxis('z', -1)
+            lastTapTime = 0
+          } else {
+            lastTapTime = now
+            lastTapX = e.clientX
+            lastTapY = e.clientY
+          }
+        }
+
+        if (didDrag) {
+          setTimeout(() => setDragging(false), 50)
+        }
+        primaryId = -1
+      }
+
+      // If transitioning from 2 pointers to 1, re-initialize single-pointer state
+      if (pointers.size === 1) {
+        const [[id, pt]] = Array.from(pointers.entries())
+        primaryId = id
+        startX = pt.x
+        startY = pt.y
+        startTime = Date.now()
+        didDrag = false
+        prevX = pt.x
+        prevY = pt.y
+        prevPinchDist = 0
       }
     }
 
-    const handlePointerCancel = () => {
-      isDown = false
-      pointerId = -1
-      setDragging(false)
+    const handlePointerCancel = (e: PointerEvent) => {
+      pointers.delete(e.pointerId)
+      if (e.pointerId === primaryId) {
+        primaryId = -1
+        setDragging(false)
+      }
     }
 
     canvas.addEventListener('pointerdown', handlePointerDown)
@@ -214,7 +465,7 @@ export function CameraController() {
       canvas.removeEventListener('pointercancel', handlePointerCancel)
       canvas.removeEventListener('lostpointercapture', handlePointerCancel)
     }
-  }, [gl, setDragging])
+  }, [gl, setDragging, navigateAxis])
 
   // Camera animation inside R3F's render loop
   useFrame(({ camera }) => {

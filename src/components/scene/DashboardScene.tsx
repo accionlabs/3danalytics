@@ -1,18 +1,45 @@
 import { useMemo, useCallback } from 'react'
+import { useThree } from '@react-three/fiber'
+import * as THREE from 'three'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
-import { grammarLayout } from '../../layouts/grammarLayout.ts'
+import { grammarLayout, Z_SPACING } from '../../layouts/grammarLayout.ts'
 import { DashboardPanel } from './DashboardPanel.tsx'
-import { CameraController } from './CameraController.tsx'
+import { CameraController, fitIdealDistance } from './CameraController.tsx'
 import { Environment } from './Environment.tsx'
 import { PostProcessing } from './PostProcessing.tsx'
 import { Connectors } from './Connectors.tsx'
 import { causalLinks } from '../../data/mockData.ts'
+
+/** Default distanceFactor (matches DashboardPanel's DEFAULT_DF) */
+const DEFAULT_DF = 2
+/** Max camera offset before nearer Z-layer occludes — must match CameraController */
+const MAX_OFFSET = Z_SPACING - 0.5
 
 export function DashboardScene() {
   const panels = useDashboardStore((s) => s.panels)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
   const navigateBack = useDashboardStore((s) => s.navigateBack)
+
+  // Compute distanceFactor: when the camera distance is capped by Z_SPACING,
+  // reduce df so the panel still fills 85% of the usable viewport.
+  // fill = (panel.size * df/DEFAULT_DF) / (2 * d * tan(fov/2) * aspect * frac)
+  // Keeping fill constant: df_new/d_new = df_old/d_old → df_new = DEFAULT_DF * d_capped/d_ideal
+  const { size, camera: threeCamera } = useThree()
+  const focusedPanel = focusedPanelId ? panels.find((p) => p.id === focusedPanelId) : undefined
+  const panelDf = (() => {
+    if (!focusedPanel) return DEFAULT_DF
+    const fov = (threeCamera as THREE.PerspectiveCamera).fov
+    const idealDist = fitIdealDistance(
+      focusedPanel.size.width, focusedPanel.size.height,
+      size.width, size.height, fov,
+    )
+    // Z=0 has nothing in front — no cap needed
+    if (focusedPanel.semantic.detailLevel === 0) return DEFAULT_DF
+    if (idealDist <= MAX_OFFSET) return DEFAULT_DF
+    // Camera is capped: shrink df proportionally to preserve 85% fill
+    return DEFAULT_DF * MAX_OFFSET / idealDist
+  })()
 
   // Compute positions for ALL panels
   const allPositions = useMemo(() => grammarLayout(panels), [panels])
@@ -87,6 +114,7 @@ export function DashboardScene() {
             onFocus={() => handlePanelClick(panel.id)}
             onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
             onDrillOut={panel.parentId ? navigateBack : undefined}
+            distanceFactor={panelDf}
           />
         )
       })}

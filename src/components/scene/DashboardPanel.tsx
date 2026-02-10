@@ -11,13 +11,14 @@ interface DashboardPanelProps {
   onFocus: () => void
   onItemClick?: (index: number) => void
   onDrillOut?: () => void
+  distanceFactor?: number
 }
 
 // Pixels per 3D unit for HTML content resolution.
 // drei's <Html transform> maps: factor = 400 / distanceFactor.
 // Setting distanceFactor = 400 / PX_PER_UNIT makes PX_PER_UNIT CSS pixels = 1 Three.js unit.
 const PX_PER_UNIT = 200
-const DISTANCE_FACTOR = 400 / PX_PER_UNIT // = 2
+const DEFAULT_DF = 400 / PX_PER_UNIT // = 2
 
 export function DashboardPanel({
   config,
@@ -26,7 +27,9 @@ export function DashboardPanel({
   onFocus,
   onItemClick,
   onDrillOut,
+  distanceFactor = DEFAULT_DF,
 }: DashboardPanelProps) {
+
   const spring = useSpring({
     position: target.position,
     rotation: target.rotation,
@@ -69,7 +72,7 @@ export function DashboardPanel({
     >
       <Html
         transform
-        distanceFactor={DISTANCE_FACTOR}
+        distanceFactor={distanceFactor}
         position={[0, 0, 0.01]}
         center
         zIndexRange={[9000, 0]}

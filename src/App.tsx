@@ -10,10 +10,12 @@ import { useKeyboardNavigation } from './hooks/useKeyboardNavigation.ts'
 import { AxisIndicators } from './components/ui/AxisIndicators.tsx'
 import { NavigationHelper } from './components/ui/NavigationHelper.tsx'
 import { HelpPopup } from './components/ui/HelpPopup.tsx'
+import { useViewport } from './hooks/useViewport.ts'
 
 export default function App() {
   const setPanels = useDashboardStore((s) => s.setPanels)
   const [helpOpen, setHelpOpen] = useState(false)
+  const { isMobile, uiScale } = useViewport()
 
   useKeyboardNavigation()
 
@@ -36,6 +38,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', handler)
   }, [toggleHelp])
 
+  const dpr: [number, number] = isMobile ? [1, 1] : [1, 1.5]
+  const antialias = !isMobile
+  const powerPreference = isMobile ? 'low-power' as const : 'default' as const
+
   return (
     <div
       style={{
@@ -48,8 +54,8 @@ export default function App() {
       <Suspense fallback={<LoadingScreen />}>
         <Canvas
           camera={{ position: [0, 0, 0], fov: 60, near: 0.1, far: 200 }}
-          gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
-          dpr={[1, 1.5]}
+          gl={{ antialias, alpha: false, powerPreference }}
+          dpr={dpr}
           style={{ background: '#0a0a1a' }}
         >
           <DashboardScene />
@@ -60,21 +66,22 @@ export default function App() {
       <div
         style={{
           position: 'absolute',
-          bottom: 20,
-          left: 20,
+          bottom: 0,
+          left: 0,
+          width: `${100 / uiScale}%`,
           display: 'flex',
           alignItems: 'center',
-          padding: '8px 14px',
+          padding: '8px 20px',
           background: 'rgba(10, 10, 26, 0.6)',
           backdropFilter: 'blur(12px)',
-          borderRadius: 8,
-          border: '1px solid rgba(60, 80, 120, 0.2)',
+          borderTop: '1px solid rgba(60, 80, 120, 0.2)',
           zIndex: 10000,
-          maxWidth: 'calc(100vw - 40px)',
+          transform: `scale(${uiScale})`,
+          transformOrigin: 'bottom left',
         }}
       >
-        <Breadcrumbs />
-        <NavigationHelper />
+        <Breadcrumbs isMobile={isMobile} />
+        {!isMobile && <NavigationHelper />}
       </div>
       <AxisIndicators />
       <HelpPopup open={helpOpen} onClose={() => setHelpOpen(false)} />
