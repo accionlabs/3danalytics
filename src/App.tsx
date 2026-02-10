@@ -66,13 +66,13 @@ export default function App() {
       <div
         style={{
           position: 'absolute',
-          bottom: 0,
+          bottom: 'env(safe-area-inset-bottom, 0px)',
           left: 0,
           width: `${100 / uiScale}%`,
           display: 'flex',
           alignItems: 'center',
           padding: '8px 20px',
-          background: 'rgba(10, 10, 26, 0.6)',
+          background: 'rgba(10, 10, 26, 0.85)',
           backdropFilter: 'blur(12px)',
           borderTop: '1px solid rgba(60, 80, 120, 0.2)',
           zIndex: 10000,
