@@ -54,6 +54,21 @@ export function DashboardScene() {
     [childMap, focusPanel],
   )
 
+  // When a focused panel is clicked again, drill to its first child
+  const handlePanelClick = useCallback(
+    (panelId: string) => {
+      if (focusedPanelId === panelId) {
+        const children = childMap.get(panelId)
+        if (children?.length) {
+          focusPanel(children[0])
+          return
+        }
+      }
+      focusPanel(panelId)
+    },
+    [focusedPanelId, childMap, focusPanel],
+  )
+
   return (
     <>
       <CameraController />
@@ -68,7 +83,7 @@ export function DashboardScene() {
             config={panel}
             target={pos}
             isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
-            onFocus={() => focusPanel(panel.id)}
+            onFocus={() => handlePanelClick(panel.id)}
             onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
           />
         )
