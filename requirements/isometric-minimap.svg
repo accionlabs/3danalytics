@@ -1,0 +1,398 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 680" width="720" height="680">
+  <defs>
+    <style>
+      .label { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; }
+      .axis-label { font-size: 13px; font-weight: 600; letter-spacing: 0.5px; }
+      .plane-label { font-size: 11px; font-weight: 500; }
+      .legend-text { font-size: 11px; fill: #aab; }
+      .legend-title { font-size: 12px; font-weight: 600; fill: #dde; }
+      .grid-label { font-size: 9px; opacity: 0.6; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="680" rx="10" fill="#0d1117"/>
+
+  <!-- Title -->
+  <text x="360" y="30" text-anchor="middle" fill="#8899bb" font-size="12" class="label" font-weight="500" letter-spacing="1.5">ISOMETRIC MINIMAP — UNIFORM 3D GRID</text>
+
+  <!--
+    GRID PARAMETERS (uniform spacing in all 3 dimensions):
+    ════════════════════════════════════════════════════════
+    Grid:     3 × 3 × 2  (X × Y × Z)
+    Spacing:  52px in each isometric direction
+
+    Isometric projection (standard 30°):
+      X-step = (+52, +30)   → lower-right diagonal
+      Y-step = (-52, +30)   → lower-left diagonal
+      Z-step = (0,  -60)    → straight up (true isometric: same visual length)
+
+    Note: For true isometric, all three step vectors have equal
+    projected length. |X-step| = |Y-step| = sqrt(52²+30²) = 60px.
+    |Z-step| = 60px. All axes are visually equal.
+
+    Origin (position 0,0,0): (360, 430)
+
+    Cube size: half-width=14, diamond-height=8, body-depth=16
+    Cube top: cy-8, Cube bottom: cy+24
+    Total cube height: 32px (well within 60px grid spacing)
+
+    Position formula:
+      screen_x = 360 + xi*52 - yi*52
+      screen_y = 430 + xi*30 + yi*30 - zi*60
+
+    Z=0 positions:          Z=1 positions (60px above):
+    (0,0): 360, 430         (0,0): 360, 370
+    (1,0): 412, 460         (1,0): 412, 400
+    (2,0): 464, 490         (2,0): 464, 430
+    (0,1): 308, 460         (0,1): 308, 400
+    (1,1): 360, 490         (1,1): 360, 430
+    (2,1): 412, 520         (2,1): 412, 460
+    (0,2): 256, 490         (0,2): 256, 430
+    (1,2): 308, 520         (1,2): 308, 460
+    (2,2): 360, 550         (2,2): 360, 490
+  -->
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 1: GRID STRUCTURE (behind everything)            -->
+  <!-- Faint lines connecting all grid positions per plane,   -->
+  <!-- plus vertical Z-connectors between planes              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- Z=0 plane grid lines (blue, very faint) -->
+  <!-- X-direction lines (rows at constant Y) -->
+  <line x1="360" y1="430" x2="464" y2="490" stroke="#4a7dff" stroke-width="0.6" opacity="0.15"/>
+  <line x1="308" y1="460" x2="412" y2="520" stroke="#4a7dff" stroke-width="0.6" opacity="0.15"/>
+  <line x1="256" y1="490" x2="360" y2="550" stroke="#4a7dff" stroke-width="0.6" opacity="0.15"/>
+  <!-- Y-direction lines (rows at constant X) -->
+  <line x1="360" y1="430" x2="256" y2="490" stroke="#27ae60" stroke-width="0.6" opacity="0.15"/>
+  <line x1="412" y1="460" x2="308" y2="520" stroke="#27ae60" stroke-width="0.6" opacity="0.15"/>
+  <line x1="464" y1="490" x2="360" y2="550" stroke="#27ae60" stroke-width="0.6" opacity="0.15"/>
+
+  <!-- Z=1 plane grid lines -->
+  <line x1="360" y1="370" x2="464" y2="430" stroke="#4a7dff" stroke-width="0.6" opacity="0.12"/>
+  <line x1="308" y1="400" x2="412" y2="460" stroke="#4a7dff" stroke-width="0.6" opacity="0.12"/>
+  <line x1="256" y1="430" x2="360" y2="490" stroke="#4a7dff" stroke-width="0.6" opacity="0.12"/>
+  <line x1="360" y1="370" x2="256" y2="430" stroke="#27ae60" stroke-width="0.6" opacity="0.12"/>
+  <line x1="412" y1="400" x2="308" y2="460" stroke="#27ae60" stroke-width="0.6" opacity="0.12"/>
+  <line x1="464" y1="430" x2="360" y2="490" stroke="#27ae60" stroke-width="0.6" opacity="0.12"/>
+
+  <!-- Z-connectors: vertical lines between Z=0 and Z=1 at each (x,y) position -->
+  <line x1="360" y1="430" x2="360" y2="370" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="412" y1="460" x2="412" y2="400" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="464" y1="490" x2="464" y2="430" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="308" y1="460" x2="308" y2="400" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="360" y1="490" x2="360" y2="430" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="412" y1="520" x2="412" y2="460" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="256" y1="490" x2="256" y2="430" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="308" y1="520" x2="308" y2="460" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+  <line x1="360" y1="550" x2="360" y2="490" stroke="#e67e22" stroke-width="0.7" opacity="0.12" stroke-dasharray="3,3"/>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 2: Z=0 PLANE — Summary Level                    -->
+  <!-- Rendering back-to-front for correct overlap            -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- Plane label -->
+  <text x="182" y="545" fill="#4a7dff" class="label plane-label" opacity="0.5">Z = 0</text>
+  <text x="182" y="558" fill="#4a7dff" class="label" font-size="9" opacity="0.35">Summary</text>
+
+  <!-- (2,2,0) — ghost (dimmed, unvisited) -->
+  <g transform="translate(360, 550)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#1e3a6e" stroke="#4a7dff" stroke-width="0.8" opacity="0.35"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#152a52" stroke="#4a7dff" stroke-width="0.5" opacity="0.35"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#193060" stroke="#4a7dff" stroke-width="0.5" opacity="0.35"/>
+  </g>
+
+  <!-- (1,2,0) -->
+  <g transform="translate(308, 520)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- (2,1,0) -->
+  <g transform="translate(412, 520)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- (0,2,0) -->
+  <g transform="translate(256, 490)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- (1,1,0) -->
+  <g transform="translate(360, 490)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- (2,0,0) — ANOMALY PANEL -->
+  <g transform="translate(464, 490)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#5a2020" stroke="#e74c3c" stroke-width="1"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#3a1515" stroke="#e74c3c" stroke-width="0.7"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#481a1a" stroke="#e74c3c" stroke-width="0.7"/>
+  </g>
+  <circle cx="464" cy="494" r="18" fill="none" stroke="#e74c3c" stroke-width="1" opacity="0.5">
+    <animate attributeName="r" values="14;20;14" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.5;0.15;0.5" dur="2s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- (0,1,0) -->
+  <g transform="translate(308, 460)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- (1,0,0) -->
+  <g transform="translate(412, 460)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- (0,0,0) -->
+  <g transform="translate(360, 430)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#1e4480" stroke="#4a7dff" stroke-width="0.5"/>
+  </g>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 3: Z=1 PLANE — Detail / Drill-down Level        -->
+  <!-- Same grid positions, shifted 60px up (Z-step)          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- Plane label -->
+  <text x="182" y="425" fill="#e67e22" class="label plane-label" opacity="0.5">Z = 1</text>
+  <text x="182" y="438" fill="#e67e22" class="label" font-size="9" opacity="0.35">Detail</text>
+
+  <!-- Ghost cubes (empty grid slots at Z=1) -->
+
+  <!-- (2,2,1) ghost -->
+  <g transform="translate(360, 490)" opacity="0.15">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="none" stroke="#e67e22" stroke-width="0.7"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (0,2,1) ghost -->
+  <g transform="translate(256, 430)" opacity="0.15">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="none" stroke="#e67e22" stroke-width="0.7"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (1,2,1) ghost -->
+  <g transform="translate(308, 460)" opacity="0.15">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="none" stroke="#e67e22" stroke-width="0.7"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (0,0,1) ghost -->
+  <g transform="translate(360, 370)" opacity="0.15">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="none" stroke="#e67e22" stroke-width="0.7"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (0,1,1) ghost -->
+  <g transform="translate(308, 400)" opacity="0.15">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="none" stroke="#e67e22" stroke-width="0.7"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- Solid Z=1 cubes (occupied) -->
+
+  <!-- (2,1,1) -->
+  <g transform="translate(412, 460)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#7a4a10" stroke="#e67e22" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#5a350c" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#6a400e" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (2,0,1) -->
+  <g transform="translate(464, 430)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#7a4a10" stroke="#e67e22" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#5a350c" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#6a400e" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (1,0,1) -->
+  <g transform="translate(412, 400)">
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#7a4a10" stroke="#e67e22" stroke-width="0.8"/>
+    <polygon points="14,0 14,16 0,24 0,8" fill="#5a350c" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#6a400e" stroke="#e67e22" stroke-width="0.5"/>
+  </g>
+
+  <!-- (1,1,1) — FOCUSED PANEL -->
+  <g transform="translate(360, 430)">
+    <!-- Outer glow -->
+    <polygon points="0,-12 18,0 0,12 -18,0" fill="#ffc857" fill-opacity="0.06"/>
+    <!-- Top face — bright -->
+    <polygon points="0,-8 14,0 0,8 -14,0" fill="#f5a623" stroke="#ffc857" stroke-width="1.5"/>
+    <!-- Right face -->
+    <polygon points="14,0 14,16 0,24 0,8" fill="#c4841a" stroke="#ffc857" stroke-width="1"/>
+    <!-- Left face -->
+    <polygon points="-14,0 0,8 0,24 -14,16" fill="#d9921e" stroke="#ffc857" stroke-width="1"/>
+    <!-- Pulse ring -->
+    <circle cx="0" cy="8" r="20" fill="none" stroke="#ffc857" stroke-width="0.8" opacity="0.35">
+      <animate attributeName="r" values="18;24;18" dur="2.5s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.35;0.1;0.35" dur="2.5s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Camera indicator near focused panel -->
+  <circle cx="340" cy="418" r="4" fill="#ffc857" stroke="#fff" stroke-width="0.8"/>
+  <text x="318" y="413" fill="#ffc857" font-size="8" class="label" text-anchor="end">◉ camera</text>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 4: ACTIVE Z-CONNECTORS                          -->
+  <!-- Solid orange lines between occupied Z=0 → Z=1 pairs   -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- Connector: (1,0) Z=0→Z=1 -->
+  <line x1="412" y1="452" x2="412" y2="408" stroke="#e67e22" stroke-width="1.2" stroke-dasharray="4,2" opacity="0.55"/>
+  <circle cx="412" cy="452" r="2" fill="#e67e22" opacity="0.6"/>
+  <circle cx="412" cy="408" r="2" fill="#e67e22" opacity="0.6"/>
+
+  <!-- Connector: (2,0) Z=0→Z=1 -->
+  <line x1="464" y1="482" x2="464" y2="438" stroke="#e67e22" stroke-width="1.2" stroke-dasharray="4,2" opacity="0.55"/>
+  <circle cx="464" cy="482" r="2" fill="#e67e22" opacity="0.6"/>
+  <circle cx="464" cy="438" r="2" fill="#e67e22" opacity="0.6"/>
+
+  <!-- Connector: (1,1) Z=0→Z=1 (focused) -->
+  <line x1="360" y1="482" x2="360" y2="438" stroke="#ffc857" stroke-width="1.5" stroke-dasharray="4,2" opacity="0.6"/>
+  <circle cx="360" cy="482" r="2" fill="#ffc857" opacity="0.7"/>
+  <circle cx="360" cy="438" r="2" fill="#ffc857" opacity="0.7"/>
+
+  <!-- Connector: (2,1) Z=0→Z=1 -->
+  <line x1="412" y1="512" x2="412" y2="468" stroke="#e67e22" stroke-width="1.2" stroke-dasharray="4,2" opacity="0.55"/>
+  <circle cx="412" cy="512" r="2" fill="#e67e22" opacity="0.6"/>
+  <circle cx="412" cy="468" r="2" fill="#e67e22" opacity="0.6"/>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 5: AXIS ARROWS & LABELS                         -->
+  <!-- Three arrows of equal visual length (60px)             -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- X-axis arrow (blue): pointing lower-right -->
+  <line x1="480" y1="510" x2="545" y2="547" stroke="#4a7dff" stroke-width="2" opacity="0.8"/>
+  <polygon points="545,547  535,540  540,550" fill="#4a7dff" opacity="0.8"/>
+  <text x="555" y="548" fill="#4a7dff" class="label axis-label">X</text>
+  <text x="555" y="563" fill="#4a7dff" class="label" font-size="9" opacity="0.55">Sequence</text>
+  <text x="555" y="575" fill="#4a7dff" class="label" font-size="9" opacity="0.55">← →</text>
+
+  <!-- Y-axis arrow (green): pointing lower-left -->
+  <line x1="240" y1="510" x2="175" y2="547" stroke="#27ae60" stroke-width="2" opacity="0.8"/>
+  <polygon points="175,547  185,540  180,550" fill="#27ae60" opacity="0.8"/>
+  <text x="145" y="548" fill="#27ae60" class="label axis-label">Y</text>
+  <text x="135" y="563" fill="#27ae60" class="label" font-size="9" opacity="0.55">Segment</text>
+  <text x="140" y="575" fill="#27ae60" class="label" font-size="9" opacity="0.55">↑ ↓</text>
+
+  <!-- Z-axis arrow (orange): pointing straight up -->
+  <line x1="175" y1="395" x2="175" y2="330" stroke="#e67e22" stroke-width="2" opacity="0.8"/>
+  <polygon points="175,330  170,342  180,342" fill="#e67e22" opacity="0.8"/>
+  <text x="155" y="325" fill="#e67e22" class="label axis-label">Z</text>
+  <text x="140" y="340" fill="#e67e22" class="label" font-size="9" opacity="0.55">Depth</text>
+  <text x="142" y="352" fill="#e67e22" class="label" font-size="9" opacity="0.55">&lt;,  &gt;.</text>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 6: GRID POSITION LABELS                         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- X labels (along Y=0 edge) -->
+  <text x="360" y="416" text-anchor="middle" fill="#4a7dff" class="label grid-label">x₀</text>
+  <text x="412" y="446" text-anchor="middle" fill="#4a7dff" class="label grid-label">x₁</text>
+  <text x="464" y="476" text-anchor="middle" fill="#4a7dff" class="label grid-label">x₂</text>
+
+  <!-- Y labels (along X=0 edge) -->
+  <text x="342" y="416" text-anchor="end" fill="#27ae60" class="label grid-label">y₀</text>
+  <text x="290" y="446" text-anchor="end" fill="#27ae60" class="label grid-label">y₁</text>
+  <text x="238" y="476" text-anchor="end" fill="#27ae60" class="label grid-label">y₂</text>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 7: SPACING ANNOTATIONS                          -->
+  <!-- Showing that all three axis spacings are equal         -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <!-- Dimension lines showing equal 60px spacing -->
+  <!-- X spacing (between x₀ and x₁ at Y=0, Z=0) -->
+  <line x1="366" y1="440" x2="406" y2="458" stroke="#4a7dff" stroke-width="0.5" opacity="0.25"/>
+  <text x="392" y="455" fill="#4a7dff" font-size="7" class="label" opacity="0.3" transform="rotate(30, 392, 455)">60</text>
+
+  <!-- Y spacing (between y₀ and y₁ at X=0, Z=0) -->
+  <line x1="354" y1="440" x2="314" y2="458" stroke="#27ae60" stroke-width="0.5" opacity="0.25"/>
+  <text x="326" y="455" fill="#27ae60" font-size="7" class="label" opacity="0.3" transform="rotate(-30, 326, 455)">60</text>
+
+  <!-- Z spacing (between Z=0 and Z=1) -->
+  <line x1="470" y1="488" x2="470" y2="432" stroke="#e67e22" stroke-width="0.5" opacity="0.25"/>
+  <text x="476" y="462" fill="#e67e22" font-size="7" class="label" opacity="0.3">60</text>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- LAYER 8: LEGEND                                       -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+
+  <rect x="20" y="600" width="680" height="65" rx="6" fill="#111827" stroke="#1e2d4a" stroke-width="0.8"/>
+
+  <!-- Column 1: Cube types -->
+  <text x="40" y="620" class="label legend-title" fill="#dde">Cubes</text>
+
+  <!-- Occupied Z=0 mini-cube -->
+  <g transform="translate(50, 640)">
+    <polygon points="0,-5 9,0 0,5 -9,0" fill="#2a5298" stroke="#4a7dff" stroke-width="0.7"/>
+    <polygon points="9,0 9,8 0,13 0,5" fill="#1a3a6e" stroke="#4a7dff" stroke-width="0.4"/>
+    <polygon points="-9,0 0,5 0,13 -9,8" fill="#1e4480" stroke="#4a7dff" stroke-width="0.4"/>
+  </g>
+  <text x="68" y="645" class="label legend-text">Occupied (Z=0)</text>
+
+  <!-- Occupied Z=1 mini-cube -->
+  <g transform="translate(170, 640)">
+    <polygon points="0,-5 9,0 0,5 -9,0" fill="#7a4a10" stroke="#e67e22" stroke-width="0.7"/>
+    <polygon points="9,0 9,8 0,13 0,5" fill="#5a350c" stroke="#e67e22" stroke-width="0.4"/>
+    <polygon points="-9,0 0,5 0,13 -9,8" fill="#6a400e" stroke="#e67e22" stroke-width="0.4"/>
+  </g>
+  <text x="188" y="645" class="label legend-text">Occupied (Z=1)</text>
+
+  <!-- Ghost mini-cube -->
+  <g transform="translate(300, 640)" opacity="0.3">
+    <polygon points="0,-5 9,0 0,5 -9,0" fill="none" stroke="#e67e22" stroke-width="0.5"/>
+    <polygon points="9,0 9,8 0,13 0,5" fill="none" stroke="#e67e22" stroke-width="0.3"/>
+    <polygon points="-9,0 0,5 0,13 -9,8" fill="none" stroke="#e67e22" stroke-width="0.3"/>
+  </g>
+  <text x="318" y="645" class="label legend-text">Empty slot</text>
+
+  <!-- Column 2: States -->
+  <text x="410" y="620" class="label legend-title" fill="#dde">States</text>
+
+  <!-- Focused mini-cube -->
+  <g transform="translate(420, 640)">
+    <polygon points="0,-5 9,0 0,5 -9,0" fill="#f5a623" stroke="#ffc857" stroke-width="1"/>
+    <polygon points="9,0 9,8 0,13 0,5" fill="#c4841a" stroke="#ffc857" stroke-width="0.7"/>
+    <polygon points="-9,0 0,5 0,13 -9,8" fill="#d9921e" stroke="#ffc857" stroke-width="0.7"/>
+  </g>
+  <text x="438" y="645" class="label legend-text">Focused</text>
+
+  <!-- Anomaly mini-cube -->
+  <g transform="translate(505, 640)">
+    <polygon points="0,-5 9,0 0,5 -9,0" fill="#5a2020" stroke="#e74c3c" stroke-width="0.7"/>
+    <polygon points="9,0 9,8 0,13 0,5" fill="#3a1515" stroke="#e74c3c" stroke-width="0.4"/>
+    <polygon points="-9,0 0,5 0,13 -9,8" fill="#481a1a" stroke="#e74c3c" stroke-width="0.4"/>
+  </g>
+  <text x="523" y="645" class="label legend-text">Anomaly</text>
+
+  <!-- Connector sample -->
+  <line x1="600" y1="633" x2="600" y2="653" stroke="#e67e22" stroke-width="1.2" stroke-dasharray="3,2" opacity="0.6"/>
+  <circle cx="600" cy="633" r="1.5" fill="#e67e22"/>
+  <circle cx="600" cy="653" r="1.5" fill="#e67e22"/>
+  <text x="612" y="647" class="label legend-text">Z-link</text>
+
+</svg>

@@ -7,7 +7,9 @@ import type { PanelConfig, PanelPosition } from '../../types/index.ts'
 interface DashboardPanelProps {
   config: PanelConfig
   target: PanelPosition
+  isDimmed: boolean
   onFocus: () => void
+  onItemClick?: (index: number) => void
 }
 
 // Pixels per 3D unit for HTML content resolution.
@@ -19,12 +21,15 @@ const DISTANCE_FACTOR = 400 / PX_PER_UNIT // = 2
 export function DashboardPanel({
   config,
   target,
+  isDimmed,
   onFocus,
+  onItemClick,
 }: DashboardPanelProps) {
   const spring = useSpring({
     position: target.position,
     rotation: target.rotation,
     scale: target.scale,
+    from: { position: target.position, rotation: target.rotation, scale: 0 },
     config: { mass: 1, tension: 80, friction: 26 },
   })
 
@@ -75,6 +80,20 @@ export function DashboardPanel({
             cursor: 'pointer',
           }}
         >
+          {/* Dim overlay for non-focused panels */}
+          {isDimmed && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '10px',
+                pointerEvents: 'none',
+                zIndex: 1,
+              }}
+            />
+          )}
+
           {/* Title bar */}
           <div
             style={{
@@ -96,6 +115,7 @@ export function DashboardPanel({
                 data={config.data}
                 width={pixelWidth - contentPadding * 2}
                 height={pixelHeight - contentPadding * 2}
+                onItemClick={onItemClick}
               />
             ) : (
               <div

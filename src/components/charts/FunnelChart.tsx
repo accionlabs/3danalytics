@@ -6,8 +6,9 @@ const COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef']
 export function FunnelChart({ data, width, height }: ChartRendererProps) {
   const stages = data as FunnelStage[]
   const maxCount = stages[0]?.count ?? 1
-  const barHeight = Math.floor((height - 20) / stages.length) - 8
   const fontSize = Math.max(10, Math.round(width * 0.024))
+  const labelHeight = fontSize + 4
+  const barHeight = Math.max(12, Math.floor((height - stages.length * labelHeight) / stages.length) - 4)
 
   return (
     <div
@@ -17,29 +18,26 @@ export function FunnelChart({ data, width, height }: ChartRendererProps) {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        gap: 6,
+        gap: 2,
         padding: '4px 0',
       }}
     >
       {stages.map((stage, i) => {
-        const barWidth = Math.max(60, (stage.count / maxCount) * (width - 20))
+        const barWidth = Math.max(40, (stage.count / maxCount) * width)
         return (
-          <div key={stage.stage} style={{ display: 'flex', alignItems: 'center' }}>
+          <div key={stage.stage}>
+            {/* Label row: stage name left, count right */}
             <div
               style={{
-                width: barWidth,
-                height: barHeight,
-                background: `linear-gradient(90deg, ${COLORS[i % COLORS.length]}, ${COLORS[i % COLORS.length]}88)`,
-                borderRadius: '0 6px 6px 0',
                 display: 'flex',
-                alignItems: 'center',
-                paddingLeft: 12,
-                transition: 'width 0.5s ease',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                marginBottom: 2,
               }}
             >
               <span
                 style={{
-                  color: '#fff',
+                  color: '#c0d0e0',
                   fontSize,
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
@@ -47,17 +45,26 @@ export function FunnelChart({ data, width, height }: ChartRendererProps) {
               >
                 {stage.stage}
               </span>
+              <span
+                style={{
+                  color: '#8090b0',
+                  fontSize: fontSize - 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {stage.count.toLocaleString()} ({stage.conversionRate}%)
+              </span>
             </div>
+            {/* Bar */}
             <div
               style={{
-                marginLeft: 10,
-                color: '#8090b0',
-                fontSize: fontSize - 1,
-                whiteSpace: 'nowrap',
+                width: barWidth,
+                height: barHeight,
+                background: `linear-gradient(90deg, ${COLORS[i % COLORS.length]}, ${COLORS[i % COLORS.length]}88)`,
+                borderRadius: '0 4px 4px 0',
+                transition: 'width 0.5s ease',
               }}
-            >
-              {stage.count.toLocaleString()} ({stage.conversionRate}%)
-            </div>
+            />
           </div>
         )
       })}

@@ -16,7 +16,7 @@ function TrendArrow({ direction }: { direction: 'up' | 'down' | 'flat' }) {
   return <span style={{ color: '#6b7280' }}>&#9644;</span>
 }
 
-export function KpiCard({ data, width, height }: ChartRendererProps) {
+export function KpiCard({ data, width, height, onItemClick }: ChartRendererProps) {
   const metrics = data as KpiMetric[]
   const cols = metrics.length <= 3 ? metrics.length : Math.ceil(metrics.length / 2)
   const gap = Math.round(width * 0.015)
@@ -38,9 +38,10 @@ export function KpiCard({ data, width, height }: ChartRendererProps) {
         justifyContent: 'center',
       }}
     >
-      {metrics.map((metric) => (
+      {metrics.map((metric, i) => (
         <div
           key={metric.label}
+          onClick={onItemClick ? (e) => { e.stopPropagation(); onItemClick(i) } : undefined}
           style={{
             width: cardWidth,
             height: cardHeight,
@@ -51,7 +52,12 @@ export function KpiCard({ data, width, height }: ChartRendererProps) {
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
+            cursor: onItemClick ? 'pointer' : 'default',
+            transition: 'border-color 0.15s',
+            ...(onItemClick ? { ':hover': { borderColor: '#3b82f6' } } : {}),
           }}
+          onMouseEnter={onItemClick ? (e) => { (e.currentTarget as HTMLElement).style.borderColor = '#3b82f6' } : undefined}
+          onMouseLeave={onItemClick ? (e) => { (e.currentTarget as HTMLElement).style.borderColor = '#1e2a40' } : undefined}
         >
           <div style={{ color: '#6080a0', fontSize: labelSize, marginBottom: 6 }}>
             {metric.label}
