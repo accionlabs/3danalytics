@@ -88,9 +88,13 @@ export default function App() {
         }}
       >
         <Breadcrumbs isMobile={isMobile} />
-        <div style={{ marginLeft: 'auto' }}>
-          <NavigationHelper compact />
-        </div>
+        {isMobile ? (
+          <div style={{ marginLeft: 'auto' }}>
+            <NavigationHelper compact />
+          </div>
+        ) : (
+          <NavigationHelper />
+        )}
       </div>
       <AxisIndicators />
       <HelpPopup open={helpOpen} onClose={() => setHelpOpen(false)} />
