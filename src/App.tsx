@@ -88,7 +88,7 @@ export default function App() {
         }}
       >
         <Breadcrumbs isMobile={isMobile} />
-        {!isMobile && <NavigationHelper />}
+        <NavigationHelper />
         <div style={{ marginLeft: 'auto' }}>
           <NavigationHelper compact />
         </div>
