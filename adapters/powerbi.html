@@ -36,6 +36,14 @@
       const container = document.getElementById('embed-container');
       const report = powerbi.embed(container, config);
 
+      // Listen for click-forwarding from parent overlay
+      window.addEventListener('message', function(evt) {
+        if (evt.data && evt.data.type === 'analytics:click') {
+          var el = document.elementFromPoint(evt.data.x, evt.data.y);
+          if (el) el.click();
+        }
+      });
+
       report.on('dataSelected', function(event) {
         try {
           var detail = event.detail;
