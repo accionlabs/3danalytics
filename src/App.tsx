@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { DashboardScene } from './components/scene/DashboardScene.tsx'
 import { Navbar } from './components/ui/Navbar.tsx'
@@ -6,6 +6,7 @@ import { Breadcrumbs } from './components/ui/Breadcrumbs.tsx'
 import { LoadingScreen } from './components/ui/LoadingScreen.tsx'
 import { useDashboardStore } from './store/dashboardStore.ts'
 import { defaultPanels } from './data/mockData.ts'
+import { embedPanels } from './data/embedMockData.ts'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation.ts'
 import { AxisIndicators } from './components/ui/AxisIndicators.tsx'
 import { NavigationHelper } from './components/ui/NavigationHelper.tsx'
@@ -17,11 +18,17 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false)
   const { isMobile, uiScale } = useViewport()
 
+  // ?mode=local uses built-in charts; default uses embed (iframes from reports repo)
+  const panels = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('mode') === 'local' ? defaultPanels : embedPanels
+  }, [])
+
   useKeyboardNavigation()
 
   useEffect(() => {
-    setPanels(defaultPanels)
-  }, [setPanels])
+    setPanels(panels)
+  }, [setPanels, panels])
 
   const toggleHelp = useCallback(() => setHelpOpen((v) => !v), [])
 
@@ -81,7 +88,9 @@ export default function App() {
         }}
       >
         <Breadcrumbs isMobile={isMobile} />
-        {!isMobile && <NavigationHelper />}
+        <div style={{ marginLeft: 'auto' }}>
+          <NavigationHelper compact />
+        </div>
       </div>
       <AxisIndicators />
       <HelpPopup open={helpOpen} onClose={() => setHelpOpen(false)} />

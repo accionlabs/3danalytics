@@ -73,13 +73,26 @@ export function DashboardScene() {
     return map
   }, [panels])
 
+  // After any drill/focus, blur the active HTML element so keyboard and
+  // pointer events return to the canvas instead of staying trapped in
+  // the drei <Html> overlay that was clicked.
+  const blurAndFocus = useCallback(
+    (targetId: string) => {
+      focusPanel(targetId)
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
+    },
+    [focusPanel],
+  )
+
   const handleItemClick = useCallback(
     (panelId: string, index: number) => {
       const children = childMap.get(panelId)
       const childId = children?.[index]
-      if (childId) focusPanel(childId)
+      if (childId) blurAndFocus(childId)
     },
-    [childMap, focusPanel],
+    [childMap, blurAndFocus],
   )
 
   // When a focused panel is clicked again, drill to its first child
@@ -88,13 +101,13 @@ export function DashboardScene() {
       if (focusedPanelId === panelId) {
         const children = childMap.get(panelId)
         if (children?.length) {
-          focusPanel(children[0])
+          blurAndFocus(children[0])
           return
         }
       }
-      focusPanel(panelId)
+      blurAndFocus(panelId)
     },
-    [focusedPanelId, childMap, focusPanel],
+    [focusedPanelId, childMap, blurAndFocus],
   )
 
   return (
@@ -113,6 +126,7 @@ export function DashboardScene() {
             isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
             onFocus={() => handlePanelClick(panel.id)}
             onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
+            onDrillTo={blurAndFocus}
             distanceFactor={panelDf}
           />
         )

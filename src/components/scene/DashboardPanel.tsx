@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { animated, useSpring } from '@react-spring/three'
 import { Html } from '@react-three/drei'
 import { getChartRenderer } from '../../registry/chartRegistry.ts'
@@ -10,6 +10,7 @@ interface DashboardPanelProps {
   isDimmed: boolean
   onFocus: () => void
   onItemClick?: (index: number) => void
+  onDrillTo?: (panelId: string) => void
   distanceFactor?: number
 }
 
@@ -19,12 +20,16 @@ interface DashboardPanelProps {
 const PX_PER_UNIT = 200
 const DEFAULT_DF = 400 / PX_PER_UNIT // = 2
 
+/** Squared pixel threshold to distinguish click from drag */
+const DRAG_THRESHOLD_SQ = 25 // 5px
+
 export function DashboardPanel({
   config,
   target,
   isDimmed,
   onFocus,
   onItemClick,
+  onDrillTo,
   distanceFactor = DEFAULT_DF,
 }: DashboardPanelProps) {
 
@@ -36,7 +41,13 @@ export function DashboardPanel({
     config: { mass: 1, tension: 80, friction: 26 },
   })
 
-  // Click on the panel — navigates camera to this panel (or away if already focused)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const pointerStart = useRef<{ x: number; y: number; id: number } | null>(null)
+  const dragging = useRef(false)
+
+  // Click on the panel — navigates camera to this panel (or away if already focused).
+  // Only fires for genuine clicks (not drags), because the browser only emits onClick
+  // when pointerdown and pointerup occur on the same element without significant movement.
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -44,6 +55,89 @@ export function DashboardPanel({
     },
     [onFocus],
   )
+
+  // ── Pointer event forwarding for drag-to-pan ──
+  // CameraController's drag handler listens on the <canvas>.  When the
+  // pointer is over an <Html> overlay the canvas never sees pointerdown.
+  // We detect when the user starts dragging (movement > threshold) and:
+  //   1. Make this panel transparent to pointer events
+  //   2. Dispatch a synthetic pointerdown on the canvas
+  // The canvas handler then takes over via setPointerCapture.
+  // For a plain click (no drag), onClick fires normally.
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') return // touch handled at window level
+    pointerStart.current = { x: e.clientX, y: e.clientY, id: e.pointerId }
+    dragging.current = false
+  }, [])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!pointerStart.current || dragging.current || e.pointerType === 'touch') return
+    const dx = e.clientX - pointerStart.current.x
+    const dy = e.clientY - pointerStart.current.y
+    if (dx * dx + dy * dy < DRAG_THRESHOLD_SQ) return
+
+    dragging.current = true
+    // Make panel transparent so the canvas receives subsequent pointer events
+    if (panelRef.current) panelRef.current.style.pointerEvents = 'none'
+    // Start the canvas drag handler with a synthetic pointerdown
+    const canvas = document.querySelector('canvas')
+    if (canvas) {
+      canvas.dispatchEvent(new PointerEvent('pointerdown', {
+        clientX: pointerStart.current.x,
+        clientY: pointerStart.current.y,
+        pointerId: pointerStart.current.id,
+        pointerType: e.pointerType,
+        bubbles: true,
+        cancelable: true,
+      }))
+    }
+  }, [])
+
+  // Restore pointer-events on the panel after a drag ends
+  useEffect(() => {
+    const restore = () => {
+      if (dragging.current && panelRef.current) {
+        panelRef.current.style.pointerEvents = 'auto'
+      }
+      dragging.current = false
+      pointerStart.current = null
+    }
+    window.addEventListener('pointerup', restore)
+    window.addEventListener('pointercancel', restore)
+    return () => {
+      window.removeEventListener('pointerup', restore)
+      window.removeEventListener('pointercancel', restore)
+    }
+  }, [])
+
+  // ── Wheel forwarding ──
+  // drei's <Html> renders into a separate React root whose DOM sits above the
+  // canvas.  Wheel events on the panel div may not reliably bubble to window
+  // (where CameraController listens).  Use a native DOM listener to intercept
+  // the event, stop it from propagating (preventing double-handling), and
+  // re-dispatch a clean copy directly on window.
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const forwardWheel = (e: WheelEvent) => {
+      e.stopPropagation()
+      window.dispatchEvent(new WheelEvent('wheel', {
+        deltaX: e.deltaX,
+        deltaY: e.deltaY,
+        deltaMode: e.deltaMode,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        shiftKey: e.shiftKey,
+        bubbles: false,
+        cancelable: true,
+      }))
+    }
+    el.addEventListener('wheel', forwardWheel, { passive: false })
+    return () => el.removeEventListener('wheel', forwardWheel)
+  }, [])
 
   const ChartComponent = getChartRenderer(config.chartType)
   const pixelWidth = Math.round(config.size.width * PX_PER_UNIT)
@@ -64,10 +158,13 @@ export function DashboardPanel({
         position={[0, 0, 0.01]}
         center
         zIndexRange={[9000, 0]}
-        style={{ pointerEvents: 'auto' }}
+        style={{ pointerEvents: 'none' }}
       >
         <div
+          ref={panelRef}
           onClick={handleClick}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
           style={{
             width: pixelWidth,
             position: 'relative',
@@ -82,6 +179,7 @@ export function DashboardPanel({
             fontFamily: 'system-ui, sans-serif',
             cursor: 'pointer',
             touchAction: 'none',
+            pointerEvents: 'auto',
           }}
         >
           {/* Dim overlay for non-focused panels */}
@@ -120,6 +218,7 @@ export function DashboardPanel({
                 width={pixelWidth - contentPadding * 2}
                 height={pixelHeight - contentPadding * 2}
                 onItemClick={onItemClick}
+                onDrillTo={onDrillTo}
               />
             ) : (
               <div

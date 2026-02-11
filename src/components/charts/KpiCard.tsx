@@ -41,7 +41,7 @@ export function KpiCard({ data, width, height, onItemClick }: ChartRendererProps
       {metrics.map((metric, i) => (
         <div
           key={metric.label}
-          onClick={onItemClick ? (e) => { e.stopPropagation(); onItemClick(i) } : undefined}
+          onClick={onItemClick ? (e) => { e.stopPropagation(); onItemClick(i, metric.label) } : undefined}
           style={{
             width: cardWidth,
             height: cardHeight,

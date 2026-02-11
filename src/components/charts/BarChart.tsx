@@ -55,7 +55,7 @@ export function BarChart({ data, width, height, onItemClick }: ChartRendererProp
           dataKey="revenue"
           radius={[4, 4, 0, 0]}
           activeBar={false}
-          onClick={onItemClick ? (_data, index, e) => { e.stopPropagation(); onItemClick(index) } : undefined}
+          onClick={onItemClick ? (_data, index, e) => { e.stopPropagation(); onItemClick(index, products[index].product) } : undefined}
         >
           {products.map((_, i) => (
             <Cell

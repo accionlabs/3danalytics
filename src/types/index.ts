@@ -33,7 +33,8 @@ export interface ChartRendererProps {
   data: unknown
   width: number
   height: number
-  onItemClick?: (index: number) => void
+  onItemClick?: (index: number, category?: string) => void
+  onDrillTo?: (panelId: string) => void
 }
 export type ChartRenderer = React.ComponentType<ChartRendererProps>
 
@@ -133,4 +134,20 @@ export interface ProductRevenue {
   product: string
   revenue: number
   growth: number
+}
+
+// ── Embed types (for iframe-based panel rendering) ──
+
+export type EmbedProvider = 'powerbi' | 'tableau' | 'looker-studio' | 'metabase' | 'looker' | 'custom'
+
+export interface EmbedConfig {
+  url: string
+  provider: EmbedProvider
+  interactive?: boolean
+  label?: string
+  sandbox?: string
+  authToken?: string
+  refreshInterval?: number
+  fallbackMessage?: string
+  drillMap?: Record<string, string>  // category label → child panel ID
 }

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Power BI Adapter</title>
+  <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2/dist/powerbi.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #embed-container { width: 100%; height: 100%; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div id="embed-container"></div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const embedUrl = params.get('embedUrl');
+    const drillField = params.get('drillField') || 'category';
+    const accessToken = params.get('token') || '';
+
+    if (!embedUrl) {
+      document.getElementById('embed-container').textContent = 'Missing embedUrl parameter';
+    } else {
+      const models = window['powerbi-client'].models;
+      const config = {
+        type: 'report',
+        embedUrl: embedUrl,
+        accessToken: accessToken,
+        tokenType: accessToken ? models.TokenType.Embed : models.TokenType.Aad,
+        settings: {
+          filterPaneEnabled: false,
+          navContentPaneEnabled: false,
+        },
+      };
+
+      const container = document.getElementById('embed-container');
+      const report = powerbi.embed(container, config);
+
+      report.on('dataSelected', function(event) {
+        try {
+          var detail = event.detail;
+          var dataPoints = detail.dataPoints || [];
+          if (dataPoints.length === 0) return;
+
+          var point = dataPoints[0];
+          var category = null;
+          var index = null;
+
+          // Extract category from the identity fields
+          var identities = point.identity || [];
+          for (var i = 0; i < identities.length; i++) {
+            var id = identities[i];
+            if (id.target && id.target.column === drillField) {
+              category = id.equals;
+              break;
+            }
+          }
+          // Fall back to first identity value
+          if (!category && identities.length > 0) {
+            category = identities[0].equals;
+          }
+
+          window.parent.postMessage({
+            type: 'analytics:drill',
+            category: category,
+            index: index,
+            value: point.values ? point.values[0] : undefined,
+          }, '*');
+        } catch (e) {
+          console.warn('Power BI adapter: failed to extract drill data', e);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

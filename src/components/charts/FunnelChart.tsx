@@ -3,7 +3,7 @@ import type { FunnelStage } from '../../types/index.ts'
 
 const COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef']
 
-export function FunnelChart({ data, width, height }: ChartRendererProps) {
+export function FunnelChart({ data, width, height, onItemClick }: ChartRendererProps) {
   const stages = data as FunnelStage[]
   const maxCount = stages[0]?.count ?? 1
   const fontSize = Math.max(10, Math.round(width * 0.024))
@@ -25,7 +25,11 @@ export function FunnelChart({ data, width, height }: ChartRendererProps) {
       {stages.map((stage, i) => {
         const barWidth = Math.max(40, (stage.count / maxCount) * width)
         return (
-          <div key={stage.stage}>
+          <div
+            key={stage.stage}
+            onClick={onItemClick ? (e) => { e.stopPropagation(); onItemClick(i, stage.stage) } : undefined}
+            style={{ cursor: onItemClick ? 'pointer' : 'default' }}
+          >
             {/* Label row: stage name left, count right */}
             <div
               style={{
