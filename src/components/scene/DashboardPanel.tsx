@@ -111,34 +111,6 @@ export function DashboardPanel({
     }
   }, [])
 
-  // ── Wheel forwarding ──
-  // drei's <Html> renders into a separate React root whose DOM sits above the
-  // canvas.  Wheel events on the panel div may not reliably bubble to window
-  // (where CameraController listens).  Use a native DOM listener to intercept
-  // the event, stop it from propagating (preventing double-handling), and
-  // re-dispatch a clean copy directly on window.
-  useEffect(() => {
-    const el = panelRef.current
-    if (!el) return
-    const forwardWheel = (e: WheelEvent) => {
-      e.stopPropagation()
-      window.dispatchEvent(new WheelEvent('wheel', {
-        deltaX: e.deltaX,
-        deltaY: e.deltaY,
-        deltaMode: e.deltaMode,
-        clientX: e.clientX,
-        clientY: e.clientY,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        shiftKey: e.shiftKey,
-        bubbles: false,
-        cancelable: true,
-      }))
-    }
-    el.addEventListener('wheel', forwardWheel, { passive: false })
-    return () => el.removeEventListener('wheel', forwardWheel)
-  }, [])
-
   const ChartComponent = getChartRenderer(config.chartType)
   const pixelWidth = Math.round(config.size.width * PX_PER_UNIT)
   const pixelHeight = Math.round(config.size.height * PX_PER_UNIT)

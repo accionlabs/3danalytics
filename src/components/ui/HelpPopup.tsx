@@ -60,6 +60,7 @@ export function HelpPopup({ open, onClose }: HelpPopupProps) {
 
   return (
     <div
+      data-ui-chrome
       style={{
         position: 'fixed',
         inset: 0,

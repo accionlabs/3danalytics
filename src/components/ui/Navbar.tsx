@@ -9,6 +9,7 @@ export function Navbar({ onHelpClick }: NavbarProps) {
 
   return (
     <nav
+      data-ui-chrome
       style={{
         position: 'absolute',
         top: 0,

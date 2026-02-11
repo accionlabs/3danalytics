@@ -200,6 +200,10 @@ export function CameraController() {
     let swipeCooldownY = false
 
     const handleWheel = (e: WheelEvent) => {
+      // Let UI chrome (nav bar, bottom bar, popups) handle its own scroll
+      const el = e.target as HTMLElement
+      if (el.closest?.('[data-ui-chrome]')) return
+
       e.preventDefault()
 
       // Ctrl/Cmd + scroll → zoom
@@ -240,8 +244,10 @@ export function CameraController() {
         return
       }
     }
-    window.addEventListener('wheel', handleWheel, { passive: false })
-    return () => window.removeEventListener('wheel', handleWheel)
+    // Capture phase so the handler fires BEFORE any element-level handler
+    // (e.g. drei's <Html> overlay) can intercept the event.
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+    return () => window.removeEventListener('wheel', handleWheel, { capture: true })
   }, [navigateAxis])
 
   // Mouse-only handler on canvas: drag to pan camera
@@ -364,9 +370,9 @@ export function CameraController() {
     const onStart = (e: TouchEvent) => {
       if (e.touches.length === 1) {
         const t = e.touches[0]
-        // Ignore touches on UI chrome (nav, bottom bar)
+        // Ignore touches on UI chrome (nav, bottom bar, popups)
         const el = t.target as HTMLElement
-        if (el.closest('nav')) return
+        if (el.closest?.('[data-ui-chrome]')) return
         touchId = t.identifier
         prevX = t.clientX
         prevY = t.clientY
@@ -492,13 +498,14 @@ export function CameraController() {
       }
     }
 
-    window.addEventListener('touchstart', onStart, { passive: false })
-    window.addEventListener('touchmove', onMove, { passive: false })
-    window.addEventListener('touchend', onEnd, { passive: true })
+    // Capture phase so touch events are caught before drei's <Html> overlay
+    window.addEventListener('touchstart', onStart, { passive: false, capture: true })
+    window.addEventListener('touchmove', onMove, { passive: false, capture: true })
+    window.addEventListener('touchend', onEnd, { passive: true, capture: true })
     return () => {
-      window.removeEventListener('touchstart', onStart)
-      window.removeEventListener('touchmove', onMove)
-      window.removeEventListener('touchend', onEnd)
+      window.removeEventListener('touchstart', onStart, { capture: true })
+      window.removeEventListener('touchmove', onMove, { capture: true })
+      window.removeEventListener('touchend', onEnd, { capture: true })
     }
   }, [navigateAxis])
 

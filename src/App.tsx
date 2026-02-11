@@ -71,6 +71,7 @@ export default function App() {
 
       <Navbar onHelpClick={toggleHelp} />
       <div
+        data-ui-chrome
         style={{
           position: 'absolute',
           bottom: 'env(safe-area-inset-bottom, 0px)',
