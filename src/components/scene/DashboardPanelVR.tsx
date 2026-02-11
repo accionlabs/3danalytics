@@ -1,5 +1,6 @@
 import { useCallback, useRef, useEffect, useState } from 'react'
 import { animated, useSpring } from '@react-spring/three'
+import { Text } from '@react-three/drei'
 import * as THREE from 'three'
 import html2canvas from 'html2canvas'
 import { createRoot } from 'react-dom/client'
@@ -127,19 +128,35 @@ export function DashboardPanelVR({
 
     // Capture and convert to texture
     const captureChart = async () => {
-      if (!containerRef.current) return
+      if (!containerRef.current) {
+        console.warn(`[VR PANEL] Container not ready for "${config.title}"`)
+        return
+      }
 
       try {
         // Wait for chart to render completely
-        await new Promise((resolve) => setTimeout(resolve, 800))
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+
+        console.log(`[VR PANEL] Starting html2canvas capture for "${config.title}"`)
 
         const canvas = await html2canvas(containerRef.current, {
           backgroundColor: 'rgba(8, 12, 28, 0.95)',
-          scale: 1.5, // High quality without being too heavy
-          logging: false,
+          scale: 1.0, // Reduced scale for better performance
+          logging: false, // Disable verbose logging
           useCORS: true,
           allowTaint: true,
+          width: pixelWidth,
+          height: pixelHeight,
+          // Ignore canvas elements to avoid WebGL cloning issues
+          ignoreElements: (element) => {
+            return element.tagName === 'CANVAS'
+          },
+          // Better rendering options for SVG charts
+          foreignObjectRendering: false,
+          removeContainer: true,
         })
+
+        console.log(`[VR PANEL] html2canvas completed for "${config.title}", creating texture`)
 
         const canvasTexture = new THREE.CanvasTexture(canvas)
         canvasTexture.needsUpdate = true
@@ -148,19 +165,22 @@ export function DashboardPanelVR({
         canvasTexture.format = THREE.RGBAFormat
 
         setTexture(canvasTexture)
-        console.log(`[VR PANEL] Texture successfully created for "${config.title}"`)
+        console.log(`[VR PANEL] ✅ Texture successfully created for "${config.title}"`)
       } catch (error) {
-        console.error(`[VR PANEL] Failed to capture chart for "${config.title}":`, error)
+        console.error(`[VR PANEL] ❌ Failed to capture chart for "${config.title}":`, error)
       }
     }
 
-    // Initial capture
-    captureChart()
+    // Initial capture with slight delay to ensure container is ready
+    const initialTimeout = setTimeout(() => {
+      captureChart()
+    }, 500)
 
-    // Update texture every 3 seconds for dynamic content
-    const interval = setInterval(captureChart, 3000)
+    // Update texture every 5 seconds for dynamic content (increased interval for stability)
+    const interval = setInterval(captureChart, 5000)
 
     return () => {
+      clearTimeout(initialTimeout)
       clearInterval(interval)
       if (rootRef.current) {
         rootRef.current.unmount()
@@ -253,6 +273,39 @@ export function DashboardPanelVR({
           side={THREE.DoubleSide}
         />
       </mesh>
+
+      {/* Loading indicator and panel info while texture is being created */}
+      {!texture && (
+        <group position={[0, 0, 0.02]}>
+          <Text
+            position={[0, 0.2, 0]}
+            fontSize={0.2}
+            color="white"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {config.title}
+          </Text>
+          <Text
+            position={[0, -0.1, 0]}
+            fontSize={0.12}
+            color="#94a3b8"
+            anchorX="center"
+            anchorY="middle"
+          >
+            Loading {config.chartType} chart...
+          </Text>
+          <Text
+            position={[0, -0.3, 0]}
+            fontSize={0.08}
+            color="#64748b"
+            anchorX="center"
+            anchorY="middle"
+          >
+            Check console for details
+          </Text>
+        </group>
+      )}
     </animated.group>
   )
 }
