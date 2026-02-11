@@ -28,6 +28,14 @@
       viz.setAttribute('hide-tabs', '');
       container.appendChild(viz);
 
+      // Listen for click-forwarding from parent overlay
+      window.addEventListener('message', function(evt) {
+        if (evt.data && evt.data.type === 'analytics:click') {
+          var el = document.elementFromPoint(evt.data.x, evt.data.y);
+          if (el) el.click();
+        }
+      });
+
       viz.addEventListener('marksselection', function(event) {
         try {
           const marks = event.detail.marksCollection;
