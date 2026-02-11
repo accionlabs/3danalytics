@@ -68,17 +68,10 @@ export function DashboardPanelSimpleVR({
       rotation={spring.rotation as unknown as [number, number, number]}
       scale={spring.scale}
     >
-      {/* Background panel - raycastable for VR interaction */}
+      {/* Background panel */}
       <mesh
         onClick={handleClick}
         onPointerDown={handlePointerDown}
-        onPointerOver={(e) => {
-          e.stopPropagation()
-          document.body.style.cursor = 'pointer'
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = 'default'
-        }}
         position={[0, 0, 0]}
       >
         <planeGeometry args={[config.size.width, config.size.height]} />

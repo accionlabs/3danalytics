@@ -5,8 +5,6 @@ import { DashboardPanel } from './DashboardPanel.tsx'
 import { DashboardPanelSimpleVR } from './DashboardPanelSimpleVR.tsx'
 import { CameraController } from './CameraController.tsx'
 import { VRControllerInput } from './VRControllerInput.tsx'
-import { VRGazeInteraction } from './VRGazeInteraction.tsx'
-import { VRNavigationGuides } from './VRNavigationGuides.tsx'
 import { VRComfortVignette } from './VRComfortVignette.tsx'
 import { Environment } from './Environment.tsx'
 import { PostProcessing } from './PostProcessing.tsx'
@@ -80,14 +78,8 @@ export function DashboardScene() {
   return (
     <>
       <CameraController />
-      {isVRMode && (
-        <>
-          <VRGazeInteraction />
-          <VRNavigationGuides />
-          <VRControllerInput />
-          {vrComfortSettings.useVignette && <VRComfortVignette />}
-        </>
-      )}
+      {isVRMode && <VRControllerInput />}
+      {isVRMode && vrComfortSettings.useVignette && <VRComfortVignette />}
       <Environment />
 
       {panels.map((panel) => {
