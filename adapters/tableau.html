@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau Adapter</title>
+  <script type="module" src="https://embedding.tableauusercontent.com/tableau.embedding.3.latest.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    tableau-viz { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="viz-container"></div>
+  <script type="module">
+    const params = new URLSearchParams(window.location.search);
+    const vizUrl = params.get('vizUrl');
+    const drillField = params.get('drillField') || 'category';
+
+    if (!vizUrl) {
+      document.getElementById('viz-container').textContent = 'Missing vizUrl parameter';
+    } else {
+      const container = document.getElementById('viz-container');
+      const viz = document.createElement('tableau-viz');
+      viz.setAttribute('src', vizUrl);
+      viz.setAttribute('toolbar', 'hidden');
+      viz.setAttribute('hide-tabs', '');
+      container.appendChild(viz);
+
+      viz.addEventListener('marksselection', function(event) {
+        try {
+          const marks = event.detail.marksCollection;
+          if (!marks || marks.length === 0) return;
+
+          const selectedMarks = marks[0].selectedMarks;
+          if (!selectedMarks || selectedMarks.length === 0) return;
+
+          const mark = selectedMarks[0];
+          let category = null;
+
+          // Look for the drill field in pairs
+          const pairs = mark.pairs || [];
+          for (const pair of pairs) {
+            if (pair.fieldName === drillField) {
+              category = pair.formattedValue || pair.value;
+              break;
+            }
+          }
+          // Fall back to first pair value
+          if (!category && pairs.length > 0) {
+            category = pairs[0].formattedValue || pairs[0].value;
+          }
+
+          window.parent.postMessage({
+            type: 'analytics:drill',
+            category: category,
+            value: mark.pairs ? Object.fromEntries(pairs.map(function(p) { return [p.fieldName, p.value]; })) : undefined,
+          }, '*');
+        } catch (e) {
+          console.warn('Tableau adapter: failed to extract drill data', e);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
