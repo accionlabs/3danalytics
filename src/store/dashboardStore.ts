@@ -92,6 +92,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   cameraTarget: OVERVIEW_CAMERA,
   isTransitioning: false,
   isDragging: false,
+  isVRMode: false,
+  vrComfortSettings: {
+    useSnapTransitions: false,
+    useVignette: true,
+    reducedSpeed: false,
+  },
 
   setPanels: (panels: PanelConfig[]) => {
     const root = panels.find((p) => !p.parentId)
@@ -214,4 +220,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   setTransitioning: (isTransitioning: boolean) => set({ isTransitioning }),
   setDragging: (isDragging: boolean) => set({ isDragging }),
+  setVRMode: (isVRMode: boolean) => set({ isVRMode }),
+  setVRComfortSettings: (settings) => set((state) => ({
+    vrComfortSettings: { ...state.vrComfortSettings, ...settings },
+  })),
 }))

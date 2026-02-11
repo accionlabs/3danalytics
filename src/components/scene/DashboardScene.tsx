@@ -2,7 +2,10 @@ import { useMemo, useCallback } from 'react'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
 import { grammarLayout } from '../../layouts/grammarLayout.ts'
 import { DashboardPanel } from './DashboardPanel.tsx'
+import { DashboardPanelSimpleVR } from './DashboardPanelSimpleVR.tsx'
 import { CameraController } from './CameraController.tsx'
+import { VRControllerInput } from './VRControllerInput.tsx'
+import { VRComfortVignette } from './VRComfortVignette.tsx'
 import { Environment } from './Environment.tsx'
 import { PostProcessing } from './PostProcessing.tsx'
 import { Connectors } from './Connectors.tsx'
@@ -13,6 +16,8 @@ export function DashboardScene() {
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
   const navigateBack = useDashboardStore((s) => s.navigateBack)
+  const isVRMode = useDashboardStore((s) => s.isVRMode)
+  const vrComfortSettings = useDashboardStore((s) => s.vrComfortSettings)
 
   // Compute positions for ALL panels
   const allPositions = useMemo(() => grammarLayout(panels), [panels])
@@ -73,19 +78,24 @@ export function DashboardScene() {
   return (
     <>
       <CameraController />
+      {isVRMode && <VRControllerInput />}
+      {isVRMode && vrComfortSettings.useVignette && <VRComfortVignette />}
       <Environment />
 
       {panels.map((panel) => {
         const pos = positionMap.get(panel.id)
         if (!pos) return null
+
+        const PanelComponent = isVRMode ? DashboardPanelSimpleVR : DashboardPanel
+
         return (
-          <DashboardPanel
+          <PanelComponent
             key={panel.id}
             config={panel}
             target={pos}
             isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
             onFocus={() => handlePanelClick(panel.id)}
-            onItemClick={childMap.has(panel.id) ? (i) => handleItemClick(panel.id, i) : undefined}
+            onItemClick={childMap.has(panel.id) ? (i: number) => handleItemClick(panel.id, i) : undefined}
             onDrillOut={panel.parentId ? navigateBack : undefined}
           />
         )

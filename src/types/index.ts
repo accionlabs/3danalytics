@@ -65,6 +65,13 @@ export interface NavigationHistory {
   currentIndex: number
 }
 
+/** VR comfort mode settings */
+export interface VRComfortSettings {
+  useSnapTransitions: boolean  // Teleport instead of smooth movement
+  useVignette: boolean          // Show vignette during transitions
+  reducedSpeed: boolean         // Slower camera animations
+}
+
 /** Dashboard state (Zustand) */
 export interface DashboardState {
   panels: PanelConfig[]
@@ -74,6 +81,8 @@ export interface DashboardState {
   cameraTarget: CameraTarget
   isTransitioning: boolean
   isDragging: boolean
+  isVRMode: boolean
+  vrComfortSettings: VRComfortSettings
   // Actions
   setPanels: (panels: PanelConfig[]) => void
   focusPanel: (id: string) => void
@@ -85,6 +94,8 @@ export interface DashboardState {
   navigateToStep: (index: number) => void
   setTransitioning: (isTransitioning: boolean) => void
   setDragging: (isDragging: boolean) => void
+  setVRMode: (isVRMode: boolean) => void
+  setVRComfortSettings: (settings: Partial<VRComfortSettings>) => void
 }
 
 // ── SaaS content pack types (domain-specific) ──

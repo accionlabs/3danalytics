@@ -15,6 +15,8 @@ export function CameraController() {
   const isTransitioning = useDashboardStore((s) => s.isTransitioning)
   const setTransitioning = useDashboardStore((s) => s.setTransitioning)
   const setDragging = useDashboardStore((s) => s.setDragging)
+  const isVRMode = useDashboardStore((s) => s.isVRMode)
+  const vrComfortSettings = useDashboardStore((s) => s.vrComfortSettings)
 
   const targetPos = useRef(new THREE.Vector3(...cameraTarget.position))
   const targetLookAt = useRef(new THREE.Vector3(...cameraTarget.lookAt))
@@ -218,7 +220,18 @@ export function CameraController() {
 
   // Camera animation inside R3F's render loop
   useFrame(({ camera }) => {
-    const lerpFactor = 0.06
+    // VR comfort mode: snap transitions (teleport) or slower lerp
+    let lerpFactor = 0.06
+
+    if (isVRMode) {
+      if (vrComfortSettings.useSnapTransitions) {
+        // Instant teleportation to reduce motion sickness
+        lerpFactor = 1.0
+      } else if (vrComfortSettings.reducedSpeed) {
+        // Slower movement for comfort
+        lerpFactor = 0.03
+      }
+    }
 
     currentPos.current.lerp(targetPos.current, lerpFactor)
     currentLookAt.current.lerp(targetLookAt.current, lerpFactor)
