@@ -62,6 +62,8 @@ export function DashboardPanelSimpleVR({
 
   return (
     <animated.group
+      name={`panel-${config.id}`}
+      userData={{ panelId: config.id }}
       position={spring.position as unknown as [number, number, number]}
       rotation={spring.rotation as unknown as [number, number, number]}
       scale={spring.scale}
