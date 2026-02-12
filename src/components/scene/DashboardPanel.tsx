@@ -3,6 +3,7 @@ import { animated, useSpring } from '@react-spring/three'
 import { Html } from '@react-three/drei'
 import { getChartRenderer } from '../../registry/chartRegistry.ts'
 import type { PanelConfig, PanelPosition } from '../../types/index.ts'
+import { useXRSession } from '../../xr/useXRSession.ts'
 
 interface DashboardPanelProps {
   config: PanelConfig
@@ -111,12 +112,18 @@ export function DashboardPanel({
     }
   }, [])
 
+  const { isInXR } = useXRSession()
+
   const ChartComponent = getChartRenderer(config.chartType)
   const pixelWidth = Math.round(config.size.width * PX_PER_UNIT)
   const pixelHeight = Math.round(config.size.height * PX_PER_UNIT)
   const titleFontSize = Math.max(11, Math.round(pixelWidth * 0.026))
   const titlePadding = Math.max(6, Math.round(pixelWidth * 0.015))
   const contentPadding = Math.max(8, Math.round(pixelWidth * 0.018))
+
+  // In VR, drei's <Html> is invisible — skip the overlay entirely.
+  // VRPanel (Phase 3B) renders texture-based panels in VR mode.
+  if (isInXR) return null
 
   return (
     <animated.group

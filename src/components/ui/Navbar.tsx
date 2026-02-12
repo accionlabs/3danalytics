@@ -1,10 +1,13 @@
+import { type ReactNode } from 'react'
 import { useViewport } from '../../hooks/useViewport.ts'
 
 interface NavbarProps {
   onHelpClick?: () => void
+  onMinimapClick?: () => void
+  vrButton?: ReactNode
 }
 
-export function Navbar({ onHelpClick }: NavbarProps) {
+export function Navbar({ onHelpClick, onMinimapClick, vrButton }: NavbarProps) {
   const { uiScale } = useViewport()
 
   return (
@@ -38,23 +41,43 @@ export function Navbar({ onHelpClick }: NavbarProps) {
       >
         3D Analytics
       </div>
-      {onHelpClick && (
-        <button
-          onClick={onHelpClick}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#60a5fa',
-            fontSize: 16,
-            cursor: 'pointer',
-            padding: '4px 8px',
-            fontWeight: 700,
-          }}
-          title="Navigation help (?)"
-        >
-          ?
-        </button>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {vrButton}
+        {onMinimapClick && (
+          <button
+            onClick={onMinimapClick}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#60a5fa',
+              fontSize: 15,
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontWeight: 700,
+            }}
+            title="Spatial map (m)"
+          >
+            &#9638;
+          </button>
+        )}
+        {onHelpClick && (
+          <button
+            onClick={onHelpClick}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#60a5fa',
+              fontSize: 16,
+              cursor: 'pointer',
+              padding: '4px 8px',
+              fontWeight: 700,
+            }}
+            title="Navigation help (?)"
+          >
+            ?
+          </button>
+        )}
+      </div>
     </nav>
   )
 }

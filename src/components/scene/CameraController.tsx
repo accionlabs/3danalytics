@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
 import { findNeighbor } from '../../hooks/useKeyboardNavigation.ts'
 import { Z_SPACING } from '../../layouts/grammarLayout.ts'
+import { useXRSession } from '../../xr/useXRSession.ts'
 
 /** Target fraction of usable viewport the focused panel should fill */
 export const TARGET_FILL = 0.85
@@ -69,6 +70,7 @@ function applyDistMult(
  * sees the correct camera position when computing distanceFactor scaling.
  */
 export function CameraController() {
+  const { isInXR } = useXRSession()
   const cameraTarget = useDashboardStore((s) => s.cameraTarget)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const isTransitioning = useDashboardStore((s) => s.isTransitioning)
@@ -192,6 +194,7 @@ export function CameraController() {
 
   // Scroll: Ctrl/Cmd+scroll = zoom, horizontal = X-axis, vertical = Y-axis
   useEffect(() => {
+    if (isInXR) return // VR camera managed by headset
     const forward = new THREE.Vector3()
     let accumulatedDeltaX = 0
     let accumulatedDeltaY = 0
@@ -248,10 +251,11 @@ export function CameraController() {
     // (e.g. drei's <Html> overlay) can intercept the event.
     window.addEventListener('wheel', handleWheel, { passive: false, capture: true })
     return () => window.removeEventListener('wheel', handleWheel, { capture: true })
-  }, [navigateAxis])
+  }, [navigateAxis, isInXR])
 
   // Mouse-only handler on canvas: drag to pan camera
   useEffect(() => {
+    if (isInXR) return
     const canvas = gl.domElement
     const DRAG_THRESHOLD = 5
     const PAN_SPEED = 0.005
@@ -313,10 +317,11 @@ export function CameraController() {
       canvas.removeEventListener('pointermove', handleMove)
       canvas.removeEventListener('pointerup', handleUp)
     }
-  }, [gl, setDragging])
+  }, [gl, setDragging, isInXR])
 
   // Viewport-wide right-click → drill out (works on canvas, panels, and empty space)
   useEffect(() => {
+    if (isInXR) return
     const handleContextMenu = (e: MouseEvent) => {
       // Allow right-click on UI chrome (nav, bottom bar)
       const el = e.target as HTMLElement
@@ -326,12 +331,13 @@ export function CameraController() {
     }
     window.addEventListener('contextmenu', handleContextMenu)
     return () => window.removeEventListener('contextmenu', handleContextMenu)
-  }, [navigateAxis])
+  }, [navigateAxis, isInXR])
 
   // Touch-only handler on window: scroll navigation, pinch zoom, two-finger tap, double-tap
   // Uses window-level touch events so it works even when the drei <Html> panel
   // overlay covers the canvas (which it does on mobile, ~85% of viewport).
   useEffect(() => {
+    if (isInXR) return
     const forward = new THREE.Vector3()
     const SCROLL_THRESHOLD = 60   // px accumulated before navigating
     const TWO_FINGER_TAP_MAX_MS = 400
@@ -507,10 +513,12 @@ export function CameraController() {
       window.removeEventListener('touchmove', onMove, { capture: true })
       window.removeEventListener('touchend', onEnd, { capture: true })
     }
-  }, [navigateAxis])
+  }, [navigateAxis, isInXR])
 
-  // Camera animation inside R3F's render loop
+  // Camera animation inside R3F's render loop — skip in VR (headset controls camera)
   useFrame(({ camera }) => {
+    if (isInXR) return
+
     const lerpFactor = 0.06
 
     currentPos.current.lerp(targetPos.current, lerpFactor)

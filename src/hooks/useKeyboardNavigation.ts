@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useDashboardStore } from '../store/dashboardStore.ts'
 import type { PanelConfig } from '../types/index.ts'
+import { xrStore } from '../xr/xrStore.ts'
 
 /** Find the nearest neighbor panel along an axis */
 export function findNeighbor(
@@ -78,6 +79,8 @@ export function useKeyboardNavigation() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't capture in VR (no keyboard)
+      if (xrStore.getState().mode != null) return
       // Don't capture when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
