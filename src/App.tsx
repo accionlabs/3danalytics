@@ -1,5 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
+import { XR, createXRStore } from '@react-three/xr'
 import { DashboardScene } from './components/scene/DashboardScene.tsx'
 import { Navbar } from './components/ui/Navbar.tsx'
 import { Breadcrumbs } from './components/ui/Breadcrumbs.tsx'
@@ -11,7 +12,11 @@ import { useKeyboardNavigation } from './hooks/useKeyboardNavigation.ts'
 import { AxisIndicators } from './components/ui/AxisIndicators.tsx'
 import { NavigationHelper } from './components/ui/NavigationHelper.tsx'
 import { HelpPopup } from './components/ui/HelpPopup.tsx'
+import { XRButton } from './components/ui/XRButton.tsx'
 import { useViewport } from './hooks/useViewport.ts'
+
+// Create XR store for VR mode (Meta Quest)
+const xrStore = createXRStore()
 
 export default function App() {
   const setPanels = useDashboardStore((s) => s.setPanels)
@@ -65,7 +70,9 @@ export default function App() {
           dpr={dpr}
           style={{ background: '#0a0a1a' }}
         >
-          <DashboardScene />
+          <XR store={xrStore}>
+            <DashboardScene />
+          </XR>
         </Canvas>
       </Suspense>
 
@@ -95,6 +102,7 @@ export default function App() {
         </div>
       </div>
       <AxisIndicators />
+      <XRButton xrStore={xrStore} isMobile={isMobile} />
       <HelpPopup open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   )
