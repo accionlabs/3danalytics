@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ChartRendererProps } from '../../types/index.ts'
 import type { EmbedConfig } from '../../types/index.ts'
 
@@ -27,16 +27,11 @@ function isDrillMessage(data: unknown): data is DrillMessage {
   )
 }
 
-/** Squared pixel threshold to distinguish click from drag */
-const CLICK_THRESHOLD_SQ = 25 // 5px
-
 export function EmbedPanel({ data, width, height, onItemClick, onDrillTo }: ChartRendererProps) {
   const config = data as EmbedConfig
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const overlayRef = useRef<HTMLDivElement>(null)
-  const pointerStart = useRef<{ x: number; y: number } | null>(null)
 
   const providerLabel = config.label ?? PROVIDER_LABELS[config.provider] ?? 'Embed'
   const sandboxValue = config.sandbox ?? 'allow-scripts allow-same-origin'
@@ -75,36 +70,6 @@ export function EmbedPanel({ data, width, height, onItemClick, onDrillTo }: Char
     return () => window.removeEventListener('message', handleMessage)
   }, [config.drillMap, onItemClick, onDrillTo])
 
-  // ── Overlay click-through ──
-  // The overlay intercepts wheel/touch (so they reach the parent document and
-  // CameraController), but clicks need to reach the iframe content for chart
-  // drill-down.  On click (no drag), send analytics:click postMessage to the
-  // iframe which simulates the click at those coordinates.
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    pointerStart.current = { x: e.clientX, y: e.clientY }
-  }, [])
-
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (!pointerStart.current) return
-    const dx = e.clientX - pointerStart.current.x
-    const dy = e.clientY - pointerStart.current.y
-    pointerStart.current = null
-
-    // Only forward clicks, not drags
-    if (dx * dx + dy * dy >= CLICK_THRESHOLD_SQ) return
-
-    // Send click coordinates relative to the iframe viewport
-    const iframe = iframeRef.current
-    if (!iframe) return
-    const rect = iframe.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    iframe.contentWindow?.postMessage(
-      { type: 'analytics:click', x, y },
-      '*',
-    )
-  }, [])
 
   return (
     <div
@@ -168,7 +133,9 @@ export function EmbedPanel({ data, width, height, onItemClick, onDrillTo }: Char
         </div>
       )}
 
-      {/* Iframe */}
+      {/* Iframe — no overlay needed as CameraController handles wheel/touch via
+          window-level event capturing. Iframe receives all pointer events naturally
+          including hover, click, and scroll. */}
       {!error && (
         <iframe
           ref={iframeRef}
@@ -180,27 +147,10 @@ export function EmbedPanel({ data, width, height, onItemClick, onDrillTo }: Char
             height: '100%',
             border: 'none',
             display: loading ? 'none' : 'block',
+            touchAction: 'none',
           }}
           onLoad={() => setLoading(false)}
           onError={() => { setLoading(false); setError(true) }}
-        />
-      )}
-
-      {/* Transparent overlay — ensures wheel/touch events stay in the parent
-          document (reaching CameraController), since events inside an iframe
-          never cross the iframe boundary.  Clicks are forwarded to the iframe
-          via postMessage so chart drill-down still works. */}
-      {!error && !loading && (
-        <div
-          ref={overlayRef}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          style={{
-            position: 'absolute',
-            inset: 0,
-            zIndex: 2,
-            touchAction: 'none',
-          }}
         />
       )}
     </div>
