@@ -34,7 +34,7 @@ export function VRButton() {
     try {
       const session = await xrStore.enterVR()
       if (session) {
-        setStatus(`OK: ${session.mode}`)
+        setStatus('OK: immersive-vr')
       } else {
         setStatus('Session=null')
       }
