@@ -29,6 +29,9 @@ export function XRTeleport({ children }: { children?: ReactNode }) {
   const isTransitioning = useDashboardStore((s) => s.isTransitioning)
   const setTransitioning = useDashboardStore((s) => s.setTransitioning)
   const worldRef = useRef<THREE.Group>(null)
+  // Prevents setTransitioning(false) firing every frame while the React
+  // re-render that flips isTransitioning is still in flight.
+  const clearedRef = useRef(false)
 
   useFrame(() => {
     if (!worldRef.current) return
@@ -45,9 +48,12 @@ export function XRTeleport({ children }: { children?: ReactNode }) {
     // Apply snap turn rotation
     worldRef.current.rotation.y = vrLocomotion.yaw
 
-    // Clear transitioning flag immediately (snap teleport)
-    if (isTransitioning) {
+    // Clear transitioning flag — call only once per transition, not every frame
+    if (isTransitioning && !clearedRef.current) {
+      clearedRef.current = true
       setTransitioning(false)
+    } else if (!isTransitioning) {
+      clearedRef.current = false
     }
   })
 

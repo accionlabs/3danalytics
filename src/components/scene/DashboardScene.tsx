@@ -23,15 +23,26 @@ function VRDebugDisplay() {
   const gl = useThree((s) => s.gl)
   const matRef = useRef<THREE.MeshBasicMaterial>(null)
   const posRef = useRef<THREE.MeshBasicMaterial>(null)
+  // Track last values to skip redundant color.set() calls every frame
+  const lastPresenting = useRef<boolean | null>(null)
+  const lastCameraType = useRef<string | null>(null)
 
   useFrame(({ camera }) => {
-    // Left box: green if presenting, red if not
+    // Left box: only update when presenting state changes
     if (matRef.current) {
-      matRef.current.color.set(gl.xr.isPresenting ? '#00ff00' : '#ff0000')
+      const presenting = gl.xr.isPresenting
+      if (presenting !== lastPresenting.current) {
+        lastPresenting.current = presenting
+        matRef.current.color.set(presenting ? '#00ff00' : '#ff0000')
+      }
     }
-    // Right box: blue if camera is ArrayCamera, yellow if PerspectiveCamera
+    // Right box: only update when camera type changes
     if (posRef.current) {
-      posRef.current.color.set(camera.type === 'ArrayCamera' ? '#0088ff' : '#ffff00')
+      const type = camera.type
+      if (type !== lastCameraType.current) {
+        lastCameraType.current = type
+        posRef.current.color.set(type === 'ArrayCamera' ? '#0088ff' : '#ffff00')
+      }
     }
   })
 

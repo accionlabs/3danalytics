@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import * as THREE from 'three'
 import type { ChartRendererProps } from '../../types/index.ts'
 import type { EmbedConfig } from '../../types/index.ts'
-import { dataUrlToTexture } from '../../xr/svgToTexture.ts'
 import { setVRTexture } from '../xr/VRPanel.tsx'
 
 /** Re-capture interval for web-mode thumbnail (ms) */
@@ -66,6 +66,9 @@ export function EmbedPanel({ data, width, height, onItemClick, onDrillTo, panelI
   const overlayRef = useRef<HTMLDivElement>(null)
   const pointerStart = useRef<{ x: number; y: number } | null>(null)
   const captureIntervalRef = useRef<number | null>(null)
+  // Persistent canvas + texture — created once, updated in-place each capture
+  const vrCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const vrTextureRef = useRef<THREE.CanvasTexture | null>(null)
 
   const providerLabel = config.label ?? PROVIDER_LABELS[config.provider] ?? 'Embed'
   const sandboxValue = config.sandbox ?? 'allow-scripts allow-same-origin'
@@ -171,12 +174,53 @@ export function EmbedPanel({ data, width, height, onItemClick, onDrillTo, panelI
     }
   }, [stopPing])
 
-  // Push each captured frame into the VR texture cache so VRPanel can display it
+  // Push each captured frame into the VR texture cache so VRPanel can display it.
+  // Canvas + CanvasTexture are created once and reused — subsequent updates only
+  // blit pixels onto the existing canvas and set needsUpdate=true, which triggers
+  // a GPU texel upload without reallocating a new texture object each time.
   useEffect(() => {
     if (!captureDataUrl || !panelId) return
-    dataUrlToTexture(captureDataUrl, 512, 512)
-      .then((texture) => setVRTexture(panelId, texture))
-      .catch(() => { /* keep existing fallback texture on error */ })
+
+    // Create canvas + texture once for the lifetime of this panel
+    if (!vrCanvasRef.current) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 512
+      canvas.height = 512
+      vrCanvasRef.current = canvas
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      vrTextureRef.current = texture
+      setVRTexture(panelId, texture)
+    }
+
+    const ctx = vrCanvasRef.current.getContext('2d')!
+    const texture = vrTextureRef.current!
+    let cancelled = false
+
+    if (typeof createImageBitmap !== 'undefined') {
+      // Fast path: hardware-accelerated off-thread PNG decode via createImageBitmap
+      fetch(captureDataUrl)
+        .then((r) => r.blob())
+        .then((blob) => createImageBitmap(blob))
+        .then((bitmap) => {
+          if (cancelled) { bitmap.close(); return }
+          ctx.drawImage(bitmap, 0, 0, 512, 512)
+          bitmap.close()
+          texture.needsUpdate = true
+        })
+        .catch(() => { /* keep previous frame on error */ })
+    } else {
+      // Fallback: standard Image element decode
+      const img = new Image()
+      img.onload = () => {
+        if (cancelled) return
+        ctx.drawImage(img, 0, 0, 512, 512)
+        texture.needsUpdate = true
+      }
+      img.src = captureDataUrl
+    }
+
+    return () => { cancelled = true }
   }, [captureDataUrl, panelId])
 
   // ── Overlay click-through ──

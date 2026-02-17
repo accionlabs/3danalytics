@@ -34,6 +34,10 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
 
     const container = containerRef.current
 
+    // Stagger renders 150 ms apart so Quest's JS thread isn't hit by N
+    // simultaneous htmlToSvgString + svgToTexture spikes at the same frame.
+    let slotIndex = 0
+
     for (const panel of panels) {
       if (panel.chartType === 'embed') continue
       if (capturedRef.current.has(panel.id)) continue
@@ -56,7 +60,13 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
         />,
       )
 
-      // Wait for React + Recharts to render, then capture
+      // Wait for React + Recharts to render, then capture.
+      // Base 500 ms for render stabilisation + 150 ms stagger per panel so
+      // texture conversion work is spread across frames instead of all hitting
+      // at once (the single-frame spike that caused Quest crashes).
+      const delay = 500 + slotIndex * 150
+      slotIndex++
+
       setTimeout(() => {
         const svgStr = htmlToSvgString(wrapper, TEX_SIZE, TEX_SIZE)
         svgToTexture(svgStr, TEX_SIZE, TEX_SIZE)
@@ -71,7 +81,7 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
             root.unmount()
             wrapper.remove()
           })
-      }, 500)
+      }, delay)
     }
   }, [active, panels])
 
