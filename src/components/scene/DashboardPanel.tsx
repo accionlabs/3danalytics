@@ -198,6 +198,7 @@ export function DashboardPanel({
                 height={pixelHeight - contentPadding * 2}
                 onItemClick={onItemClick}
                 onDrillTo={onDrillTo}
+                panelId={config.id}
               />
             ) : (
               <div

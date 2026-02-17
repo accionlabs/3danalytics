@@ -35,6 +35,8 @@ export interface ChartRendererProps {
   height: number
   onItemClick?: (index: number, category?: string) => void
   onDrillTo?: (panelId: string) => void
+  /** Panel ID — used by embed panels to push captured frames into the VR texture cache */
+  panelId?: string
 }
 export type ChartRenderer = React.ComponentType<ChartRendererProps>
 

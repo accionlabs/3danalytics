@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ChartRendererProps } from '../../types/index.ts'
 import type { EmbedConfig } from '../../types/index.ts'
+import { dataUrlToTexture } from '../../xr/svgToTexture.ts'
+import { setVRTexture } from '../xr/VRPanel.tsx'
 
 /** Re-capture interval for web-mode thumbnail (ms) */
 const WEB_RECAPTURE_INTERVAL_MS = 2000
@@ -55,7 +57,7 @@ function isDrillMessage(data: unknown): data is DrillMessage {
 /** Squared pixel threshold to distinguish click from drag */
 const CLICK_THRESHOLD_SQ = 25 // 5px
 
-export function EmbedPanel({ data, width, height, onItemClick, onDrillTo }: ChartRendererProps) {
+export function EmbedPanel({ data, width, height, onItemClick, onDrillTo, panelId }: ChartRendererProps) {
   const config = data as EmbedConfig
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -168,6 +170,14 @@ export function EmbedPanel({ data, width, height, onItemClick, onDrillTo }: Char
       if (captureIntervalRef.current !== null) clearInterval(captureIntervalRef.current)
     }
   }, [stopPing])
+
+  // Push each captured frame into the VR texture cache so VRPanel can display it
+  useEffect(() => {
+    if (!captureDataUrl || !panelId) return
+    dataUrlToTexture(captureDataUrl, 512, 512)
+      .then((texture) => setVRTexture(panelId, texture))
+      .catch(() => { /* keep existing fallback texture on error */ })
+  }, [captureDataUrl, panelId])
 
   // ── Overlay click-through ──
   // The overlay intercepts wheel/touch (so they reach the parent document and
