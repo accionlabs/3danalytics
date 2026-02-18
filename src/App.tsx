@@ -1,4 +1,4 @@
-import { Component, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Component, Suspense, useCallback, useEffect, useState } from 'react'
 import type { ReactNode, ErrorInfo } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { XR } from '@react-three/xr'
@@ -7,8 +7,8 @@ import { Navbar } from './components/ui/Navbar.tsx'
 import { Breadcrumbs } from './components/ui/Breadcrumbs.tsx'
 import { LoadingScreen } from './components/ui/LoadingScreen.tsx'
 import { useDashboardStore } from './store/dashboardStore.ts'
-import { defaultPanels } from './data/mockData.ts'
-import { embedPanels } from './data/embedMockData.ts'
+import { fetchAllChartSummaries, fetchChart } from './services/chartApi.ts'
+import { loadDashboardFromApi } from './data/apiTransforms.ts'
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation.ts'
 import { AxisIndicators } from './components/ui/AxisIndicators.tsx'
 import { NavigationHelper } from './components/ui/NavigationHelper.tsx'
@@ -63,6 +63,12 @@ class CanvasErrorBoundary extends Component<
 
 export default function App() {
   const setPanels = useDashboardStore((s) => s.setPanels)
+  const setCausalLinks = useDashboardStore((s) => s.setCausalLinks)
+  const setLoading = useDashboardStore((s) => s.setLoading)
+  const setError = useDashboardStore((s) => s.setError)
+  const panels = useDashboardStore((s) => s.panels)
+  const isLoading = useDashboardStore((s) => s.isLoading)
+  const error = useDashboardStore((s) => s.error)
   const [helpOpen, setHelpOpen] = useState(false)
   const [minimapOpen, setMinimapOpen] = useState(false)
   const { isMobile, uiScale } = useViewport()
@@ -75,17 +81,34 @@ export default function App() {
     })
   }, [])
 
-  // ?mode=local uses built-in charts; default uses embed (iframes from reports repo)
-  const panels = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
-    return params.get('mode') === 'local' ? defaultPanels : embedPanels
-  }, [])
+  // Load dashboard data from the Semantic Chart Engine API
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const { panels: loaded, causalLinks } = await loadDashboardFromApi(
+          fetchAllChartSummaries,
+          fetchChart,
+        )
+        if (!cancelled) {
+          setPanels(loaded)
+          setCausalLinks(causalLinks)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load dashboard data')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => { cancelled = true }
+  }, [setPanels, setCausalLinks, setLoading, setError])
 
   useKeyboardNavigation()
-
-  useEffect(() => {
-    setPanels(panels)
-  }, [setPanels, panels])
 
   const toggleHelp = useCallback(() => setHelpOpen((v) => !v), [])
   const toggleMinimap = useCallback(() => setMinimapOpen((v) => !v), [])
@@ -110,6 +133,25 @@ export default function App() {
   const dpr: [number, number] = isMobile ? [1, 1] : [1, 1.5]
   const antialias = !isMobile
   const powerPreference = isMobile ? 'low-power' as const : 'default' as const
+
+  if (isLoading) return <LoadingScreen />
+
+  if (error) {
+    return (
+      <div style={{
+        width: '100vw', height: '100dvh', background: '#0a0a1a',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', gap: 12, color: '#e05555', fontSize: 14,
+      }}>
+        <span style={{ fontWeight: 600 }}>Failed to load dashboard</span>
+        <span style={{ color: '#607090', maxWidth: 400, textAlign: 'center' }}>{error}</span>
+        <span style={{ color: '#607090', fontSize: 12 }}>
+          Make sure the Semantic Chart Engine is running at{' '}
+          <code style={{ color: '#8898aa' }}>http://localhost:3000</code>
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div

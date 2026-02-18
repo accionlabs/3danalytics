@@ -14,7 +14,6 @@ import { CameraController, fitIdealDistance } from './CameraController.tsx'
 import { Environment } from './Environment.tsx'
 import { PostProcessing } from './PostProcessing.tsx'
 import { Connectors } from './Connectors.tsx'
-import { causalLinks } from '../../data/mockData.ts'
 import { useXRSession } from '../../xr/useXRSession.ts'
 
 /** Debug display in VR — colored boxes encode XR state as colors */
@@ -72,6 +71,7 @@ const MAX_OFFSET = Z_SPACING - 0.5
 export function DashboardScene() {
   const { isInXR } = useXRSession()
   const panels = useDashboardStore((s) => s.panels)
+  const causalLinks = useDashboardStore((s) => s.causalLinks)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
   const gl = useThree((s) => s.gl)

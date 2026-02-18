@@ -69,14 +69,20 @@ export interface NavigationHistory {
 /** Dashboard state (Zustand) */
 export interface DashboardState {
   panels: PanelConfig[]
+  causalLinks: CausalLink[]
   focusedPanelId: string | null
   navigation: NavigationHistory
   visiblePanelIds: string[]
   cameraTarget: CameraTarget
   isTransitioning: boolean
   isDragging: boolean
+  isLoading: boolean
+  error: string | null
   // Actions
   setPanels: (panels: PanelConfig[]) => void
+  setCausalLinks: (links: CausalLink[]) => void
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
   focusPanel: (id: string) => void
   unfocus: () => void
   navigateTo: (panelId: string, axis: 'x' | 'y' | 'z') => void

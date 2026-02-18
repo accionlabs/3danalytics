@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { DashboardState, PanelConfig, CameraTarget, NavigationHistory } from '../types/index.ts'
+import type { DashboardState, PanelConfig, CausalLink, CameraTarget, NavigationHistory } from '../types/index.ts'
 import { grammarLayout } from '../layouts/grammarLayout.ts'
 
 /** Default overview camera — centered on the grammar layout */
@@ -86,12 +86,15 @@ function allPanelIds(panels: PanelConfig[]): string[] {
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   panels: [],
+  causalLinks: [],
   focusedPanelId: null,
   navigation: EMPTY_NAV,
   visiblePanelIds: [],
   cameraTarget: OVERVIEW_CAMERA,
   isTransitioning: false,
   isDragging: false,
+  isLoading: false,
+  error: null,
 
   setPanels: (panels: PanelConfig[]) => {
     const root = panels.find((p) => !p.parentId)
@@ -106,6 +109,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         : EMPTY_NAV,
     })
   },
+
+  setCausalLinks: (links: CausalLink[]) => set({ causalLinks: links }),
+  setLoading: (isLoading: boolean) => set({ isLoading }),
+  setError: (error: string | null) => set({ error }),
 
   focusPanel: (id: string) => {
     const { panels, focusedPanelId } = get()
