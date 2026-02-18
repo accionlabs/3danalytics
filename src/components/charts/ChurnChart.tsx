@@ -10,7 +10,8 @@ export function ChurnChart({ data, width, height }: ChartRendererProps) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    drawChurnChart(canvas, chartData, width, height)
+    const cleanup = drawChurnChart(canvas, chartData, width, height)
+    return cleanup ?? undefined
   }, [chartData, width, height])
 
   return <canvas ref={canvasRef} style={{ display: 'block' }} />

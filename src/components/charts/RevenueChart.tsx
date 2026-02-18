@@ -10,7 +10,8 @@ export function RevenueChart({ data, width, height }: ChartRendererProps) {
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    drawRevenueChart(canvas, chartData, width, height)
+    const cleanup = drawRevenueChart(canvas, chartData, width, height)
+    return cleanup ?? undefined
   }, [chartData, width, height])
 
   return <canvas ref={canvasRef} style={{ display: 'block' }} />

@@ -56,8 +56,8 @@ export function drawKpiCard(
   height: number,
   onItemClick?: (index: number, label: string) => void,
 ): (() => void) | void {
-  const ctx = canvas.getContext('2d')
-  if (!ctx || metrics.length === 0) return
+  if (metrics.length === 0) return
+  const ctx = canvas.getContext('2d')!
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
   canvas.width = width * dpr
@@ -139,8 +139,10 @@ export function drawKpiCard(
   canvas.style.cursor = 'pointer'
   const handleClick = (e: MouseEvent) => {
     const rect = canvas.getBoundingClientRect()
-    const mx = e.clientX - rect.left
-    const my = e.clientY - rect.top
+    const scaleX = canvas.offsetWidth / rect.width
+    const scaleY = canvas.offsetHeight / rect.height
+    const mx = (e.clientX - rect.left) * scaleX
+    const my = (e.clientY - rect.top) * scaleY
     for (const card of cardHits) {
       if (mx >= card.x && mx <= card.x + card.w && my >= card.y && my <= card.y + card.h) {
         e.stopPropagation()
@@ -153,8 +155,10 @@ export function drawKpiCard(
   // Hover highlight
   const handleMouseMove = (e: MouseEvent) => {
     const rect = canvas.getBoundingClientRect()
-    const mx = e.clientX - rect.left
-    const my = e.clientY - rect.top
+    const scaleX = canvas.offsetWidth / rect.width
+    const scaleY = canvas.offsetHeight / rect.height
+    const mx = (e.clientX - rect.left) * scaleX
+    const my = (e.clientY - rect.top) * scaleY
     // Redraw all cards, highlighting hovered one
     ctx.clearRect(0, 0, width, height)
     ctx.fillStyle = '#080c1c'
