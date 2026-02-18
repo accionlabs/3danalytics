@@ -17,7 +17,7 @@ import { Minimap } from './components/ui/Minimap.tsx'
 import { useViewport } from './hooks/useViewport.ts'
 import { xrStore } from './xr/xrStore.ts'
 import { VRButton } from './components/xr/VRButton.tsx'
-import { OffscreenChartRenderer } from './xr/OffscreenChartRenderer.tsx'
+import { ChartGPUOffscreenRenderer } from './xr/ChartGPUOffscreenRenderer.tsx'
 
 /**
  * Error boundary for the Canvas — catches WebGL context loss crashes
@@ -177,8 +177,8 @@ export default function App() {
         </Suspense>
       </CanvasErrorBoundary>
 
-      {/* Offscreen chart renderer — captures charts as textures for VR */}
-      <OffscreenChartRenderer panels={panels} active={isInXR} />
+      {/* Offscreen chart renderer — captures charts as textures for VR via ChartGPU */}
+      <ChartGPUOffscreenRenderer panels={panels} active={isInXR} />
 
       <Navbar onHelpClick={toggleHelp} onMinimapClick={toggleMinimap} vrButton={<VRButton />} />
       <div
