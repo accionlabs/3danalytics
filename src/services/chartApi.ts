@@ -5,7 +5,7 @@
 
 const BASE_URL =
   (import.meta as ImportMeta & { env: Record<string, string> }).env
-    ?.VITE_API_URL ?? 'http://172.16.28.181:3000';
+    ?.VITE_API_URL ?? 'http://192.168.0.205:3000';
 const DEFAULT_PLATFORM = '3danalytics';
 
 // ── API response types (mirror the OpenAPI schema) ──────────────────────────

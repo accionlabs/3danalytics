@@ -1,24 +1,9 @@
-import type { KpiMetric } from '../../../types/index.ts'
-
-function formatValue(value: number, unit: string): string {
-  if (unit === '$') {
-    if (value >= 1000) return `$${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`
-    return `$${value.toFixed(2)}`
-  }
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`
-  return `${value}`
-}
+import type { KpiCardItem } from '../../../types/chartData.ts'
 
 function trendArrow(direction: 'up' | 'down' | 'flat'): string {
   if (direction === 'up') return '▲'
   if (direction === 'down') return '▼'
   return '▬'
-}
-
-function trendColor(direction: 'up' | 'down' | 'flat'): string {
-  if (direction === 'up') return '#10b981'
-  if (direction === 'down') return '#f43f5e'
-  return '#6b7280'
 }
 
 function roundedRect(
@@ -46,17 +31,18 @@ type CardHit = { x: number; y: number; w: number; h: number; i: number; label: s
 
 /**
  * Draws a KPI card grid using Canvas 2D API.
+ * Generic implementation — accepts any KPI items with pre-formatted values.
  * Returns a cleanup function when interactive (removes event listeners).
  * Safe to call in the VR texture pipeline — no DOM visibility required.
  */
 export function drawKpiCard(
   canvas: HTMLCanvasElement,
-  metrics: KpiMetric[],
+  items: KpiCardItem[],
   width: number,
   height: number,
   onItemClick?: (index: number, label: string) => void,
 ): (() => void) | void {
-  if (metrics.length === 0) return
+  if (items.length === 0) return
   const ctx = canvas.getContext('2d')!
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
@@ -70,8 +56,8 @@ export function drawKpiCard(
   ctx.fillStyle = '#080c1c'
   ctx.fillRect(0, 0, width, height)
 
-  const cols = metrics.length <= 3 ? metrics.length : Math.ceil(metrics.length / 2)
-  const rows = Math.ceil(metrics.length / cols)
+  const cols = items.length <= 3 ? items.length : Math.ceil(items.length / 2)
+  const rows = Math.ceil(items.length / cols)
   const gap = Math.round(width * 0.025)
   const padX = Math.round(width * 0.03)
   const padY = Math.round(height * 0.03)
@@ -84,7 +70,7 @@ export function drawKpiCard(
 
   const cardHits: CardHit[] = []
 
-  metrics.forEach((metric, i) => {
+  items.forEach((item, i) => {
     const col = i % cols
     const row = Math.floor(i / cols)
     const cx = padX + col * (cardW + gap)
@@ -101,9 +87,12 @@ export function drawKpiCard(
     ctx.lineWidth = 1
     ctx.stroke()
 
-    // Layout: center the three text lines vertically inside the card
+    // Layout: center text lines vertically inside the card
     const innerPadX = Math.round(cardW * 0.1)
-    const totalTextHeight = labelSize + valueSize + trendSize + 10  // 10 = spacing
+    const hasTrend = !!item.trend
+    const totalTextHeight = hasTrend
+      ? labelSize + valueSize + trendSize + 10
+      : labelSize + valueSize + 4
     const textStartY = cy + (cardH - totalTextHeight) / 2
 
     // Label
@@ -111,27 +100,28 @@ export function drawKpiCard(
     ctx.font = `${labelSize}px system-ui, sans-serif`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'
-    ctx.fillText(metric.label, cx + innerPadX, textStartY, cardW - innerPadX * 2)
+    ctx.fillText(item.label, cx + innerPadX, textStartY, cardW - innerPadX * 2)
 
-    // Value
+    // Value (pre-formatted string)
     ctx.fillStyle = '#e0e8f0'
     ctx.font = `700 ${valueSize}px system-ui, sans-serif`
     ctx.textBaseline = 'top'
-    ctx.fillText(formatValue(metric.value, metric.unit), cx + innerPadX, textStartY + labelSize + 4, cardW - innerPadX * 2)
+    ctx.fillText(item.value, cx + innerPadX, textStartY + labelSize + 4, cardW - innerPadX * 2)
 
-    // Trend arrow + percentage on same line
-    const trendY = textStartY + labelSize + 4 + valueSize + 6
-    const color = trendColor(metric.trendDirection)
-    ctx.font = `${trendSize}px system-ui, sans-serif`
-    ctx.fillStyle = color
-    ctx.textBaseline = 'top'
-    const arrow = trendArrow(metric.trendDirection)
-    ctx.fillText(arrow, cx + innerPadX, trendY)
-    const arrowW = ctx.measureText(arrow + ' ').width
-    const trendStr = `${metric.trend > 0 ? '+' : ''}${metric.trend}%`
-    ctx.fillText(trendStr, cx + innerPadX + arrowW, trendY)
+    // Trend (optional)
+    if (hasTrend) {
+      const trendY = textStartY + labelSize + 4 + valueSize + 6
+      const color = item.trend!.color
+      ctx.font = `${trendSize}px system-ui, sans-serif`
+      ctx.fillStyle = color
+      ctx.textBaseline = 'top'
+      const arrow = trendArrow(item.trend!.direction)
+      ctx.fillText(arrow, cx + innerPadX, trendY)
+      const arrowW = ctx.measureText(arrow + ' ').width
+      ctx.fillText(item.trend!.value, cx + innerPadX + arrowW, trendY)
+    }
 
-    cardHits.push({ x: cx, y: cy, w: cardW, h: cardH, i, label: metric.label })
+    cardHits.push({ x: cx, y: cy, w: cardW, h: cardH, i, label: item.label })
   })
 
   if (!onItemClick) return
@@ -164,7 +154,7 @@ export function drawKpiCard(
     ctx.fillStyle = '#080c1c'
     ctx.fillRect(0, 0, width, height)
 
-    metrics.forEach((metric, i) => {
+    items.forEach((item, i) => {
       const card = cardHits[i]
       const hovered = mx >= card.x && mx <= card.x + card.w && my >= card.y && my <= card.y + card.h
 
@@ -178,27 +168,32 @@ export function drawKpiCard(
       ctx.stroke()
 
       const innerPadX = Math.round(card.w * 0.1)
-      const totalTextHeight = labelSize + valueSize + trendSize + 10
+      const hasTrend = !!item.trend
+      const totalTextHeight = hasTrend
+        ? labelSize + valueSize + trendSize + 10
+        : labelSize + valueSize + 4
       const textStartY = card.y + (card.h - totalTextHeight) / 2
 
       ctx.fillStyle = '#6080a0'
       ctx.font = `${labelSize}px system-ui, sans-serif`
       ctx.textAlign = 'left'
       ctx.textBaseline = 'top'
-      ctx.fillText(metric.label, card.x + innerPadX, textStartY, card.w - innerPadX * 2)
+      ctx.fillText(item.label, card.x + innerPadX, textStartY, card.w - innerPadX * 2)
 
       ctx.fillStyle = '#e0e8f0'
       ctx.font = `700 ${valueSize}px system-ui, sans-serif`
-      ctx.fillText(formatValue(metric.value, metric.unit), card.x + innerPadX, textStartY + labelSize + 4, card.w - innerPadX * 2)
+      ctx.fillText(item.value, card.x + innerPadX, textStartY + labelSize + 4, card.w - innerPadX * 2)
 
-      const trendY = textStartY + labelSize + 4 + valueSize + 6
-      const color = trendColor(metric.trendDirection)
-      ctx.font = `${trendSize}px system-ui, sans-serif`
-      ctx.fillStyle = color
-      const arrow = trendArrow(metric.trendDirection)
-      ctx.fillText(arrow, card.x + innerPadX, trendY)
-      const arrowW = ctx.measureText(arrow + ' ').width
-      ctx.fillText(`${metric.trend > 0 ? '+' : ''}${metric.trend}%`, card.x + innerPadX + arrowW, trendY)
+      if (hasTrend) {
+        const trendY = textStartY + labelSize + 4 + valueSize + 6
+        const color = item.trend!.color
+        ctx.font = `${trendSize}px system-ui, sans-serif`
+        ctx.fillStyle = color
+        const arrow = trendArrow(item.trend!.direction)
+        ctx.fillText(arrow, card.x + innerPadX, trendY)
+        const arrowW = ctx.measureText(arrow + ' ').width
+        ctx.fillText(item.trend!.value, card.x + innerPadX + arrowW, trendY)
+      }
     })
   }
 

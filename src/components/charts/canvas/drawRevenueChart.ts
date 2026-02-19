@@ -1,25 +1,21 @@
 import * as d3 from 'd3'
-import type { RevenueDataPoint } from '../../../types/index.ts'
+import type { LineChartPoint, LineSeries } from '../../../types/chartData.ts'
 import { drawTooltip } from './tooltipHelper.ts'
 
-const LINES: Array<{ key: 'mrr' | 'newRevenue' | 'churnedRevenue'; color: string; label: string }> = [
-  { key: 'mrr', color: '#3b82f6', label: 'MRR' },
-  { key: 'newRevenue', color: '#10b981', label: 'New Revenue' },
-  { key: 'churnedRevenue', color: '#f43f5e', label: 'Churned' },
-]
-
 /**
- * Draws a multi-line revenue chart using D3 + Canvas 2D API.
+ * Draws a multi-line chart using D3 + Canvas 2D API.
+ * Generic implementation — accepts any time series data with configurable lines.
  * Returns a cleanup function (removes event listeners).
  * Safe to call in the VR texture pipeline — no DOM visibility required.
  */
 export function drawRevenueChart(
   canvas: HTMLCanvasElement,
-  chartData: RevenueDataPoint[],
+  chartData: LineChartPoint[],
+  series: LineSeries[],
   width: number,
   height: number,
 ): (() => void) | void {
-  if (chartData.length === 0) return
+  if (chartData.length === 0 || series.length === 0) return
   const ctx = canvas.getContext('2d')!
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
@@ -36,10 +32,10 @@ export function drawRevenueChart(
   const fontSize = Math.max(10, Math.round(width * 0.024))
   const tooltipFontSize = Math.max(11, Math.round(width * 0.026))
 
-  const months = chartData.map((d) => d.month)
-  const xScale = d3.scalePoint().domain(months).range([ml, width - mr])
+  const xLabels = chartData.map((d) => d.x)
+  const xScale = d3.scalePoint().domain(xLabels).range([ml, width - mr])
 
-  const allValues = LINES.flatMap((l) => chartData.map((d) => d[l.key]))
+  const allValues = series.flatMap((l) => chartData.map((d) => Number(d[l.key]) || 0))
   const maxY = d3.max(allValues) ?? 0
   const yScale = d3
     .scaleLinear()
@@ -47,8 +43,16 @@ export function drawRevenueChart(
     .range([height - mb, mt])
     .nice()
 
-  // Pre-compute screen x positions for each month (used in hit-testing)
-  const monthXs = months.map((m) => xScale(m) ?? 0)
+  // Pre-compute screen x positions for each x label (used in hit-testing)
+  const xPositions = xLabels.map((label) => xScale(label) ?? 0)
+
+  // Generic number formatter - adapts to value magnitude
+  function formatValue(val: number): string {
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`
+    if (val >= 1000) return `${(val / 1000).toFixed(0)}k`
+    if (val % 1 === 0) return val.toString()
+    return val.toFixed(1)
+  }
 
   function drawBase() {
     ctx.clearRect(0, 0, width, height)
@@ -72,23 +76,23 @@ export function drawRevenueChart(
     ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
     for (const tick of yScale.ticks(5)) {
-      ctx.fillText(`$${(tick / 1000).toFixed(0)}k`, ml - 6, yScale(tick))
+      ctx.fillText(formatValue(tick), ml - 6, yScale(tick))
     }
 
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    for (const month of months) {
+    for (const month of xLabels) {
       ctx.fillText(month, xScale(month) ?? 0, height - mb + 6)
     }
 
-    for (const { key, color } of LINES) {
+    for (const { key, color } of series) {
       ctx.strokeStyle = color
       ctx.lineWidth = 2
       ctx.lineJoin = 'round'
       ctx.beginPath()
       chartData.forEach((d, i) => {
-        const x = xScale(d.month) ?? 0
-        const y = yScale(d[key])
+        const x = xScale(d.x) ?? 0
+        const y = yScale(Number(d[key]) || 0)
         if (i === 0) ctx.moveTo(x, y)
         else ctx.lineTo(x, y)
       })
@@ -101,7 +105,7 @@ export function drawRevenueChart(
     ctx.textBaseline = 'middle'
     ctx.textAlign = 'left'
     ctx.font = `${fontSize}px system-ui, sans-serif`
-    for (const { color, label } of LINES) {
+    for (const { color, label } of series) {
       ctx.fillStyle = color
       ctx.fillRect(legendX, legendY - 4, 14, 3)
       ctx.fillStyle = '#8090a0'
@@ -124,7 +128,7 @@ export function drawRevenueChart(
     // Find the nearest data-point index by X proximity
     let nearestIdx = 0
     let minDist = Infinity
-    monthXs.forEach((px, i) => {
+    xPositions.forEach((px, i) => {
       const dist = Math.abs(mx - px)
       if (dist < minDist) { minDist = dist; nearestIdx = i }
     })
@@ -134,17 +138,20 @@ export function drawRevenueChart(
     ctx.putImageData(snapshot, 0, 0)
     if (inChartArea && minDist < xScale.step() / 2 + 4) {
       const d = chartData[nearestIdx]
-      drawTooltip(ctx, mx, my, [
-        d.month,
-        `MRR: $${d.mrr.toLocaleString()}`,
-        `New Rev: $${d.newRevenue.toLocaleString()}`,
-        `Churned: $${d.churnedRevenue.toLocaleString()}`,
-      ], width, height, tooltipFontSize)
+      // Build tooltip lines: x-label + all series values
+      const tooltipLines = [
+        d.x,
+        ...series.map(({ key, label }) => {
+          const value = Number(d[key]) || 0
+          return `${label}: ${formatValue(value)}`
+        })
+      ]
+      drawTooltip(ctx, mx, my, tooltipLines, width, height, tooltipFontSize)
 
       // Crosshair dot on each line at this x
-      for (const { key, color } of LINES) {
-        const px = monthXs[nearestIdx]
-        const py = yScale(d[key])
+      for (const { key, color } of series) {
+        const px = xPositions[nearestIdx]
+        const py = yScale(Number(d[key]) || 0)
         ctx.beginPath()
         ctx.arc(px, py, 4, 0, Math.PI * 2)
         ctx.fillStyle = color

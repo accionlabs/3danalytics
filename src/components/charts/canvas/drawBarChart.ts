@@ -1,24 +1,25 @@
 import * as d3 from 'd3'
-import type { ProductRevenue } from '../../../types/index.ts'
+import type { BarItem } from '../../../types/chartData.ts'
 import { drawTooltip } from './tooltipHelper.ts'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#f43f5e']
 
-type BarHit = { x: number; y: number; w: number; h: number; i: number; product: string }
+type BarHit = { x: number; y: number; w: number; h: number; i: number; label: string }
 
 /**
  * Draws a bar chart using D3 + Canvas 2D API.
+ * Generic implementation — accepts any data via BarItem interface.
  * Returns a cleanup function (removes event listeners).
  * Safe to call in the VR texture pipeline — no DOM visibility required.
  */
 export function drawBarChart(
   canvas: HTMLCanvasElement,
-  products: ProductRevenue[],
+  items: BarItem[],
   width: number,
   height: number,
-  onItemClick?: (index: number, product: string) => void,
+  onItemClick?: (index: number, label: string) => void,
 ): (() => void) | void {
-  if (products.length === 0) return
+  if (items.length === 0) return
   const ctx = canvas.getContext('2d')!
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
@@ -37,18 +38,26 @@ export function drawBarChart(
 
   const xScale = d3
     .scaleBand()
-    .domain(products.map((d) => d.product))
+    .domain(items.map((d) => d.label))
     .range([ml, width - mr])
     .padding(0.25)
 
-  const maxRevenue = d3.max(products, (d) => d.revenue) ?? 0
+  const maxValue = d3.max(items, (d) => d.value) ?? 0
   const yScale = d3
     .scaleLinear()
-    .domain([0, maxRevenue * 1.1])
+    .domain([0, maxValue * 1.1])
     .range([height - mb, mt])
     .nice()
 
   const barPositions: BarHit[] = []
+
+  // Generic number formatter - adapts to value magnitude
+  function formatValue(val: number): string {
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`
+    if (val >= 1000) return `${(val / 1000).toFixed(0)}k`
+    if (val % 1 === 0) return val.toString()
+    return val.toFixed(1)
+  }
 
   function drawBase() {
     ctx.clearRect(0, 0, width, height)
@@ -72,18 +81,19 @@ export function drawBarChart(
     ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
     for (const tick of yScale.ticks(5)) {
-      ctx.fillText(`$${(tick / 1000).toFixed(0)}k`, ml - 6, yScale(tick))
+      ctx.fillText(formatValue(tick), ml - 6, yScale(tick))
     }
 
     barPositions.length = 0
-    products.forEach((d, i) => {
-      const bx = xScale(d.product) ?? 0
+    items.forEach((d, i) => {
+      const bx = xScale(d.label) ?? 0
       const bw = xScale.bandwidth()
-      const by = yScale(d.revenue)
+      const by = yScale(d.value)
       const bh = height - mb - by
       const r = Math.min(4, bw / 2)
 
-      ctx.fillStyle = COLORS[i % COLORS.length]
+      // Use custom color if provided, otherwise cycle through default palette
+      ctx.fillStyle = d.color || COLORS[i % COLORS.length]
       ctx.beginPath()
       ctx.moveTo(bx + r, by)
       ctx.lineTo(bx + bw - r, by)
@@ -95,15 +105,15 @@ export function drawBarChart(
       ctx.closePath()
       ctx.fill()
 
-      barPositions.push({ x: bx, y: by, w: bw, h: bh, i, product: d.product })
+      barPositions.push({ x: bx, y: by, w: bw, h: bh, i, label: d.label })
     })
 
     ctx.fillStyle = '#7090b0'
     ctx.font = `${fontSize}px system-ui, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    for (const d of products) {
-      ctx.fillText(d.product, (xScale(d.product) ?? 0) + xScale.bandwidth() / 2, height - mb + 6)
+    for (const d of items) {
+      ctx.fillText(d.label, (xScale(d.label) ?? 0) + xScale.bandwidth() / 2, height - mb + 6)
     }
   }
 
@@ -134,11 +144,10 @@ export function drawBarChart(
 
     ctx.putImageData(snapshot, 0, 0)
     if (hovered) {
-      const p = products[hovered.i]
+      const item = items[hovered.i]
       drawTooltip(ctx, mx, my, [
-        p.product,
-        `$${p.revenue.toLocaleString()}`,
-        `${p.growth > 0 ? '+' : ''}${p.growth}% growth`,
+        item.label,
+        item.value.toLocaleString(),
       ], width, height, tooltipFontSize)
     }
   }
@@ -155,7 +164,7 @@ export function drawBarChart(
     for (const bar of barPositions) {
       if (mx >= bar.x && mx <= bar.x + bar.w && my >= bar.y && my <= bar.y + bar.h) {
         e.stopPropagation()
-        onItemClick(bar.i, bar.product)
+        onItemClick(bar.i, bar.label)
         break
       }
     }

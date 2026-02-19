@@ -1,19 +1,21 @@
 import * as d3 from 'd3'
-import type { ChurnDataPoint } from '../../../types/index.ts'
+import type { AreaChartData } from '../../../types/chartData.ts'
 import { drawTooltip } from './tooltipHelper.ts'
 
 /**
- * Draws an area chart showing churn rate over time with an average reference line.
+ * Draws an area chart with optional reference line.
+ * Generic implementation — accepts any time series data.
  * Uses D3 + Canvas 2D API.
  * Returns a cleanup function (removes event listeners).
  * Safe to call in the VR texture pipeline — no DOM visibility required.
  */
 export function drawChurnChart(
   canvas: HTMLCanvasElement,
-  chartData: ChurnDataPoint[],
+  config: AreaChartData,
   width: number,
   height: number,
 ): (() => void) | void {
+  const { points: chartData, referenceLine } = config
   if (chartData.length === 0) return
   const ctx = canvas.getContext('2d')!
 
@@ -31,18 +33,27 @@ export function drawChurnChart(
   const fontSize = Math.max(10, Math.round(width * 0.024))
   const tooltipFontSize = Math.max(11, Math.round(width * 0.026))
 
-  const avgChurn = chartData.reduce((sum, d) => sum + d.churnRate, 0) / chartData.length
-  const months = chartData.map((d) => d.month)
-  const xScale = d3.scalePoint().domain(months).range([ml, width - mr])
+  // Calculate average value if reference line not provided
+  const avgValue = referenceLine?.value ?? (chartData.reduce((sum, d) => sum + d.y, 0) / chartData.length)
+  const xLabels = chartData.map((d) => d.x)
+  const xScale = d3.scalePoint().domain(xLabels).range([ml, width - mr])
 
-  const maxChurn = d3.max(chartData, (d) => d.churnRate) ?? 0
+  const maxValue = d3.max(chartData, (d) => d.y) ?? 0
   const yScale = d3
     .scaleLinear()
-    .domain([0, Math.max(maxChurn * 1.1, avgChurn * 1.3)])
+    .domain([0, Math.max(maxValue * 1.1, avgValue * 1.3)])
     .range([height - mb, mt])
     .nice()
 
-  const monthXs = months.map((m) => xScale(m) ?? 0)
+  const xPositions = xLabels.map((label) => xScale(label) ?? 0)
+
+  // Generic number formatter
+  function formatValue(val: number): string {
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`
+    if (val >= 1000) return `${(val / 1000).toFixed(0)}k`
+    if (val % 1 === 0) return val.toString()
+    return val.toFixed(1)
+  }
 
   function drawBase() {
     ctx.clearRect(0, 0, width, height)
@@ -68,13 +79,13 @@ export function drawChurnChart(
     ctx.fillStyle = grad
     ctx.beginPath()
     chartData.forEach((d, i) => {
-      const x = xScale(d.month) ?? 0
-      const y = yScale(d.churnRate)
+      const x = xScale(d.x) ?? 0
+      const y = yScale(d.y)
       if (i === 0) ctx.moveTo(x, y)
       else ctx.lineTo(x, y)
     })
-    const lastX = xScale(chartData[chartData.length - 1].month) ?? 0
-    const firstX = xScale(chartData[0].month) ?? 0
+    const lastX = xScale(chartData[chartData.length - 1].x) ?? 0
+    const firstX = xScale(chartData[0].x) ?? 0
     ctx.lineTo(lastX, height - mb)
     ctx.lineTo(firstX, height - mb)
     ctx.closePath()
@@ -86,40 +97,42 @@ export function drawChurnChart(
     ctx.lineJoin = 'round'
     ctx.beginPath()
     chartData.forEach((d, i) => {
-      const x = xScale(d.month) ?? 0
-      const y = yScale(d.churnRate)
+      const x = xScale(d.x) ?? 0
+      const y = yScale(d.y)
       if (i === 0) ctx.moveTo(x, y)
       else ctx.lineTo(x, y)
     })
     ctx.stroke()
 
-    // Average reference line
-    const avgY = yScale(avgChurn)
-    ctx.strokeStyle = '#f59e0b'
+    // Reference line (e.g., average)
+    const refY = yScale(avgValue)
+    const refColor = referenceLine?.color || '#f59e0b'
+    const refLabel = referenceLine?.label || 'Avg'
+    ctx.strokeStyle = refColor
     ctx.lineWidth = 1.5
     ctx.setLineDash([5, 5])
     ctx.beginPath()
-    ctx.moveTo(ml, avgY)
-    ctx.lineTo(width - mr, avgY)
+    ctx.moveTo(ml, refY)
+    ctx.lineTo(width - mr, refY)
     ctx.stroke()
     ctx.setLineDash([])
 
-    ctx.fillStyle = '#f59e0b'
+    ctx.fillStyle = refColor
     ctx.font = `${fontSize}px system-ui, sans-serif`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    ctx.fillText('Avg', width - mr + 4, avgY)
+    ctx.fillText(refLabel, width - mr + 4, refY)
 
     ctx.fillStyle = '#7090b0'
     ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
     for (const tick of yScale.ticks(5)) {
-      ctx.fillText(`${tick}%`, ml - 6, yScale(tick))
+      ctx.fillText(formatValue(tick), ml - 6, yScale(tick))
     }
 
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    for (const month of months) {
+    for (const month of xLabels) {
       ctx.fillText(month, xScale(month) ?? 0, height - mb + 6)
     }
   }
@@ -137,7 +150,7 @@ export function drawChurnChart(
 
     let nearestIdx = 0
     let minDist = Infinity
-    monthXs.forEach((px, i) => {
+    xPositions.forEach((px, i) => {
       const dist = Math.abs(mx - px)
       if (dist < minDist) { minDist = dist; nearestIdx = i }
     })
@@ -147,15 +160,13 @@ export function drawChurnChart(
     if (inChartArea && minDist < (xScale.step() ?? width) / 2 + 4) {
       const d = chartData[nearestIdx]
       drawTooltip(ctx, mx, my, [
-        d.month,
-        `Churn Rate: ${d.churnRate}%`,
-        `Customers: ${d.customers.toLocaleString()}`,
-        `Churned: ${d.churned.toLocaleString()}`,
+        d.x,
+        formatValue(d.y),
       ], width, height, tooltipFontSize)
 
       // Dot on the line at nearest point
-      const px = monthXs[nearestIdx]
-      const py = yScale(d.churnRate)
+      const px = xPositions[nearestIdx]
+      const py = yScale(d.y)
       ctx.beginPath()
       ctx.arc(px, py, 4, 0, Math.PI * 2)
       ctx.fillStyle = '#f43f5e'
