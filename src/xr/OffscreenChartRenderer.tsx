@@ -66,7 +66,10 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
         <ChartComponent data={panel.data} width={TEX_SIZE} height={TEX_SIZE} />,
       )
 
-      // Allow React + useEffect to commit, then capture
+      // Allow React + useEffect to commit, then capture.
+      // Timeout increased to 800ms — React 18 concurrent rendering + D3 drawing
+      // can be slower when the browser is busy with 3D scene updates. This is
+      // a one-time cost when entering VR, not user-visible.
       setTimeout(() => {
         const chartCanvas = wrapper.querySelector('canvas') as HTMLCanvasElement | null
 
@@ -79,10 +82,20 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
           const copyCtx = offscreen.getContext('2d')
           if (copyCtx) {
             copyCtx.drawImage(chartCanvas, 0, 0)
-            const texture = new THREE.CanvasTexture(offscreen)
-            texture.needsUpdate = true
-            setVRTexture(panel.id, texture)
-            console.log(`[OffscreenChartRenderer] Canvas texture: ${panel.title}`)
+
+            // Sanity check: verify canvas has content (not blank due to race condition)
+            const sample = copyCtx.getImageData(0, 0, Math.min(100, offscreen.width), Math.min(100, offscreen.height))
+            const hasContent = sample.data.some((val, i) => i % 4 === 3 && val > 10)
+
+            if (hasContent) {
+              const texture = new THREE.CanvasTexture(offscreen)
+              texture.needsUpdate = true
+              setVRTexture(panel.id, texture)
+              console.log(`[OffscreenChartRenderer] Canvas texture: ${panel.title}`)
+            } else {
+              console.warn(`[OffscreenChartRenderer] Canvas empty for ${panel.title}, using fallback`)
+              setVRTexture(panel.id, createFallbackTexture(panel.title))
+            }
           } else {
             setVRTexture(panel.id, createFallbackTexture(panel.title))
           }
@@ -104,7 +117,7 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
               wrapper.remove()
             })
         }
-      }, 150)
+      }, 800)
     }
   }, [active, panels])
 
