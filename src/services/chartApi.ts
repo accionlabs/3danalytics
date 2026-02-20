@@ -10,7 +10,13 @@ const DEFAULT_PLATFORM = '3danalytics';
 
 // ── API response types (mirror the OpenAPI schema) ──────────────────────────
 
-export type ApiChartType = 'kpi' | 'bar' | 'funnel' | 'revenue' | 'churn';
+export type ApiChartType =
+  | 'kpi'
+  | 'bar'
+  | 'funnel'
+  | 'revenue'
+  | 'churn'
+  | 'stackedBar';
 export type ApiTrendDirection = 'up' | 'down' | 'flat';
 
 export interface ApiChartSize {
@@ -216,5 +222,62 @@ export async function navigateByVoice(
   }
 
   const json = (await response.json()) as { data: VoiceNavigationResponse };
+  return json.data;
+}
+
+// ── Voice Visualization Generation API ──────────────────────────────────────
+
+export interface VisualizationRequest {
+  /** User query describing desired visualization */
+  query: string;
+}
+
+export interface VisualizationResponse {
+  /** User's original query */
+  query: string;
+  /** AI reasoning about how to visualize the query */
+  reasoning: string;
+  /** Narrative explanation of the generated visualizations */
+  narrative: string;
+  /** Generated chart configurations */
+  data: ApiChart[];
+  /** Key insights derived from the data */
+  keyInsights: string[];
+  /** Generation metadata */
+  meta: {
+    total: number;
+    successful: number;
+    failed: number;
+    visualizationsGenerated: number;
+  };
+}
+
+/**
+ * Generate visualizations from natural language query.
+ * AI interprets the query and returns chart configurations with data.
+ */
+export async function generateVisualization(
+  request: VisualizationRequest,
+  platformId: string = DEFAULT_PLATFORM,
+): Promise<VisualizationResponse> {
+  const response = await fetch(
+    `${BASE_URL}/api/platforms/${platformId}/userquery`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      body.error ?? `Visualization generation failed: ${response.status}`,
+    );
+  }
+
+  const json = (await response.json()) as { data: VisualizationResponse };
   return json.data;
 }

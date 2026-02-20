@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { DashboardState, PanelConfig, CausalLink, CameraTarget, NavigationHistory } from '../types/index.ts'
 import { grammarLayout } from '../layouts/grammarLayout.ts'
-import { classifyIntent, navigateByVoice } from '../services/chartApi.ts'
+import { classifyIntent, navigateByVoice, generateVisualization } from '../services/chartApi.ts'
 
 /** Default overview camera — centered on the grammar layout */
 const OVERVIEW_CAMERA: CameraTarget = {
@@ -268,20 +268,55 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           panelId: response.panelId,
         }
       } else {
-        // Visualization flow - placeholder for future implementation
+        // Visualization flow - generate charts from natural language query
         console.log('[Voice Visualization] Request:', {
           query: transcript,
           confidence: intentResponse.confidence,
           reasoning: intentResponse.reasoning,
         })
 
-        // TODO: Implement visualization creation logic
-        console.log('[Voice Visualization] Visualization creation not yet implemented')
+        // Call visualization generation API
+        const vizResponse = await generateVisualization({ query: transcript })
+
+        console.log('[Voice Visualization] API Response:', {
+          chartsGenerated: vizResponse.data.length,
+          narrative: vizResponse.narrative,
+          insights: vizResponse.keyInsights,
+          meta: vizResponse.meta,
+        })
+
+        // Convert API charts to PanelConfig format
+        const newPanels: PanelConfig[] = vizResponse.data.map((chart) => ({
+          id: chart.id,
+          title: chart.title,
+          chartType: chart.chartType as any, // API types match our chart registry
+          size: chart.size,
+          data: chart.data,
+          semantic: chart.semantic,
+          processLabel: chart.processLabel,
+          parentId: chart.parentId ?? undefined,
+          segmentLabel: chart.segmentLabel ?? undefined,
+        }))
+
+        // Replace entire panel structure with new visualization
+        // This prevents overlapping panels from multiple generations
+        set({
+          panels: newPanels,
+          visiblePanelIds: allPanelIds(newPanels),
+        })
+
+        // Navigate to the first generated panel if any
+        if (newPanels.length > 0) {
+          get().focusPanel(newPanels[0].id)
+        }
 
         return {
           success: true,
           intent: 'visualization',
-          message: 'Visualization request logged (implementation pending)',
+          chartsGenerated: vizResponse.data.length,
+          narrative: vizResponse.narrative,
+          keyInsights: vizResponse.keyInsights,
+          panelIds: newPanels.map(p => p.id),
         }
       }
     } catch (err) {
