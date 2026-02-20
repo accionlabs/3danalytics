@@ -5,7 +5,7 @@
 
 const BASE_URL =
   (import.meta as ImportMeta & { env: Record<string, string> }).env
-    ?.VITE_API_URL ?? 'http://192.168.0.205:3000';
+    ?.VITE_API_URL ?? 'http://172.16.28.181:3000';
 const DEFAULT_PLATFORM = '3danalytics';
 
 // ── API response types (mirror the OpenAPI schema) ──────────────────────────
@@ -121,4 +121,52 @@ export async function fetchChartChildren(
   return apiFetch<ApiChart[]>(
     `/api/platforms/${platformId}/charts/${chartId}/children`,
   );
+}
+
+// ── Voice Navigation API ─────────────────────────────────────────────────────
+
+export interface VoiceNavigationRequest {
+  /** Transcript from speech recognition */
+  query: string;
+  /** List of currently visible panel IDs and titles */
+  availablePanels: Array<{ id: string; title: string }>;
+}
+
+export interface VoiceNavigationResponse {
+  /** Panel ID to navigate to */
+  panelId: string;
+  /** Optional confidence score (0-1) */
+  confidence?: number;
+  /** Optional explanation of why this panel was selected */
+  reason?: string;
+}
+
+/**
+ * Send voice transcript to API to determine which panel to navigate to.
+ * API receives the query + list of available panels and returns the best match.
+ */
+export async function navigateByVoice(
+  request: VoiceNavigationRequest,
+  platformId: string = DEFAULT_PLATFORM,
+): Promise<VoiceNavigationResponse> {
+  const response = await fetch(
+    `${BASE_URL}/api/platforms/${platformId}/navigate-by-voice`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      body.error ?? `Voice navigation failed: ${response.status}`,
+    );
+  }
+
+  const json = (await response.json()) as { data: VoiceNavigationResponse };
+  return json.data;
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { DashboardState, PanelConfig, CausalLink, CameraTarget, NavigationHistory } from '../types/index.ts'
 import { grammarLayout } from '../layouts/grammarLayout.ts'
+import { navigateByVoice } from '../services/chartApi.ts'
 
 /** Default overview camera — centered on the grammar layout */
 const OVERVIEW_CAMERA: CameraTarget = {
@@ -221,4 +222,52 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   setTransitioning: (isTransitioning: boolean) => set({ isTransitioning }),
   setDragging: (isDragging: boolean) => set({ isDragging }),
+
+  /**
+   * Handle voice navigation - sends transcript + panel list to API,
+   * receives panel ID, and navigates to it.
+   */
+  handleVoiceNavigation: async (transcript: string) => {
+    const { panels } = get()
+
+    // Prepare panel list for API
+    const availablePanels = panels.map((panel) => ({
+      id: panel.id,
+      title: panel.title,
+    }))
+
+    try {
+      console.log('[Voice Navigation] Sending to API:', { transcript, availablePanels })
+
+      // Call API with transcript and panel list
+      const response = await navigateByVoice({
+        query: transcript,
+        availablePanels,
+      })
+
+      console.log('[Voice Navigation] API Response:', response)
+
+      // Validate that the returned panel ID exists
+      const targetPanel = panels.find((p) => p.id === response.panelId)
+      if (!targetPanel) {
+        throw new Error(`Panel "${response.panelId}" not found in current dashboard`)
+      }
+
+      // Navigate to the panel
+      get().focusPanel(response.panelId)
+
+      return {
+        success: true,
+        panelId: response.panelId,
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Voice navigation failed'
+      console.error('[Voice Navigation] Error:', errorMessage)
+
+      return {
+        success: false,
+        error: errorMessage,
+      }
+    }
+  },
 }))

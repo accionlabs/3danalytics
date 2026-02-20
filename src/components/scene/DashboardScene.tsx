@@ -10,6 +10,7 @@ import { VRNavigation } from '../xr/VRNavigation.tsx'
 import { VRHUD } from '../xr/VRHUD.tsx'
 import { VRAxisLabels } from '../xr/VRAxisLabels.tsx'
 import { VRComfortVignette } from '../xr/VRComfortVignette.tsx'
+import { VRSpeechButton } from '../xr/VRSpeechButton.tsx'
 import { CameraController, fitIdealDistance } from './CameraController.tsx'
 import { Environment } from './Environment.tsx'
 import { PostProcessing } from './PostProcessing.tsx'
@@ -194,6 +195,7 @@ export function DashboardScene() {
           <Connectors links={causalLinks} positionMap={positionMap} />
         </VRNavigation>
         <VRHUD />
+        <VRSpeechButton />
         <VRComfortVignette />
         <PostProcessing />
       </>

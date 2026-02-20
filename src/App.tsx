@@ -18,6 +18,7 @@ import { useViewport } from './hooks/useViewport.ts'
 import { xrStore } from './xr/xrStore.ts'
 import { VRButton } from './components/xr/VRButton.tsx'
 import { OffscreenChartRenderer } from './xr/OffscreenChartRenderer.tsx'
+import { SpeechRecognitionButton } from './components/ui/SpeechRecognitionButton.tsx'
 
 /**
  * Error boundary for the Canvas — catches WebGL context loss crashes
@@ -208,6 +209,9 @@ export default function App() {
       <AxisIndicators />
       <HelpPopup open={helpOpen} onClose={() => setHelpOpen(false)} />
       <Minimap open={minimapOpen} onClose={() => setMinimapOpen(false)} />
+
+      {/* Speech recognition button — only show in desktop mode, not in VR */}
+      {!isInXR && <SpeechRecognitionButton uiScale={uiScale} />}
     </div>
   )
 }

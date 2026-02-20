@@ -92,6 +92,7 @@ export interface DashboardState {
   navigateToStep: (index: number) => void
   setTransitioning: (isTransitioning: boolean) => void
   setDragging: (isDragging: boolean) => void
+  handleVoiceNavigation: (transcript: string) => Promise<{ success: boolean; panelId?: string; error?: string }>
 }
 
 // ── SaaS content pack types (domain-specific) ──
