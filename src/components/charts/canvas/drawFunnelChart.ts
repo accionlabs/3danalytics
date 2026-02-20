@@ -38,12 +38,25 @@ export function drawFunnelChart(
 
   const barPositions: BarHit[] = []
 
-  // Generic number formatter - adapts to value magnitude
+  // Compact number formatter for labels - adapts to value magnitude
   function formatValue(val: number): string {
     if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`
     if (val >= 1000) return `${(val / 1000).toFixed(0)}k`
     if (val % 1 === 0) return val.toLocaleString()
     return val.toFixed(1)
+  }
+
+  // Detailed number formatter for tooltips - shows full numbers with proper formatting
+  function formatTooltipValue(val: number): string {
+    // For whole numbers, use locale string without decimals
+    if (val % 1 === 0) {
+      return val.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    }
+    // For decimal numbers, show up to 2 decimal places
+    return val.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    })
   }
 
   function drawBase() {
@@ -139,7 +152,7 @@ export function drawFunnelChart(
       const stage = stages[hovered.i]
       const tooltipLines = [
         stage.label,
-        formatValue(stage.value),
+        formatTooltipValue(stage.value),
       ]
       if (stage.conversionRate !== undefined) {
         tooltipLines.push(`Conversion: ${stage.conversionRate}%`)

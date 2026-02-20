@@ -47,12 +47,25 @@ export function drawChurnChart(
 
   const xPositions = xLabels.map((label) => xScale(label) ?? 0)
 
-  // Generic number formatter
+  // Compact number formatter for labels - adapts to value magnitude
   function formatValue(val: number): string {
     if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`
     if (val >= 1000) return `${(val / 1000).toFixed(0)}k`
     if (val % 1 === 0) return val.toString()
     return val.toFixed(1)
+  }
+
+  // Detailed number formatter for tooltips - shows full numbers with proper formatting
+  function formatTooltipValue(val: number): string {
+    // For whole numbers, use locale string without decimals
+    if (val % 1 === 0) {
+      return val.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    }
+    // For decimal numbers, show up to 2 decimal places
+    return val.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    })
   }
 
   function drawBase() {
@@ -161,7 +174,7 @@ export function drawChurnChart(
       const d = chartData[nearestIdx]
       drawTooltip(ctx, mx, my, [
         d.x,
-        formatValue(d.y),
+        formatTooltipValue(d.y),
       ], width, height, tooltipFontSize)
 
       // Dot on the line at nearest point
