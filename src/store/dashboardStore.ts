@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { DashboardState, PanelConfig, CausalLink, CameraTarget, NavigationHistory } from '../types/index.ts'
 import { grammarLayout } from '../layouts/grammarLayout.ts'
-import { navigateByVoice } from '../services/chartApi.ts'
+import { classifyIntent, navigateByVoice } from '../services/chartApi.ts'
 
 /** Default overview camera — centered on the grammar layout */
 const OVERVIEW_CAMERA: CameraTarget = {
@@ -224,45 +224,69 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setDragging: (isDragging: boolean) => set({ isDragging }),
 
   /**
-   * Handle voice navigation - sends transcript + panel list to API,
-   * receives panel ID, and navigates to it.
+   * Handle voice navigation - classifies intent (navigation vs visualization),
+   * then either navigates to a panel or handles visualization request.
    */
   handleVoiceNavigation: async (transcript: string) => {
     const { panels } = get()
 
-    // Prepare panel list for API
-    const availablePanels = panels.map((panel) => ({
-      id: panel.id,
-      title: panel.title,
-    }))
-
     try {
-      console.log('[Voice Navigation] Sending to API:', { transcript, availablePanels })
+      // Step 1: Classify user intent
+      console.log('[Voice] Classifying intent for:', transcript)
+      const intentResponse = await classifyIntent({ query: transcript })
+      console.log('[Voice] Intent classification:', intentResponse)
 
-      // Call API with transcript and panel list
-      const response = await navigateByVoice({
-        query: transcript,
-        availablePanels,
-      })
+      // Step 2: Handle based on intent
+      if (intentResponse.intent === 'navigation') {
+        // Navigation flow - find and navigate to the panel
+        const availablePanels = panels.map((panel) => ({
+          id: panel.id,
+          title: panel.title,
+        }))
 
-      console.log('[Voice Navigation] API Response:', response)
+        console.log('[Voice Navigation] Sending to API:', { transcript, availablePanels })
 
-      // Validate that the returned panel ID exists
-      const targetPanel = panels.find((p) => p.id === response.panelId)
-      if (!targetPanel) {
-        throw new Error(`Panel "${response.panelId}" not found in current dashboard`)
-      }
+        const response = await navigateByVoice({
+          query: transcript,
+          availablePanels,
+        })
 
-      // Navigate to the panel
-      get().focusPanel(response.panelId)
+        console.log('[Voice Navigation] API Response:', response)
 
-      return {
-        success: true,
-        panelId: response.panelId,
+        // Validate that the returned panel ID exists
+        const targetPanel = panels.find((p) => p.id === response.panelId)
+        if (!targetPanel) {
+          throw new Error(`Panel "${response.panelId}" not found in current dashboard`)
+        }
+
+        // Navigate to the panel
+        get().focusPanel(response.panelId)
+
+        return {
+          success: true,
+          intent: 'navigation',
+          panelId: response.panelId,
+        }
+      } else {
+        // Visualization flow - placeholder for future implementation
+        console.log('[Voice Visualization] Request:', {
+          query: transcript,
+          confidence: intentResponse.confidence,
+          reasoning: intentResponse.reasoning,
+        })
+
+        // TODO: Implement visualization creation logic
+        console.log('[Voice Visualization] Visualization creation not yet implemented')
+
+        return {
+          success: true,
+          intent: 'visualization',
+          message: 'Visualization request logged (implementation pending)',
+        }
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Voice navigation failed'
-      console.error('[Voice Navigation] Error:', errorMessage)
+      const errorMessage = err instanceof Error ? err.message : 'Voice command failed'
+      console.error('[Voice] Error:', errorMessage)
 
       return {
         success: false,

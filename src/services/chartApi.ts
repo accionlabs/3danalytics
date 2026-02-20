@@ -123,6 +123,54 @@ export async function fetchChartChildren(
   );
 }
 
+// ── Voice Intent Classification API ──────────────────────────────────────────
+
+export interface IntentClassificationRequest {
+  /** User query from speech recognition */
+  query: string;
+}
+
+export interface IntentClassificationResponse {
+  /** Intent type: 'navigation' or 'visualization' */
+  intent: 'navigation' | 'visualization';
+  /** Confidence score (0-1) */
+  confidence: number;
+  /** Explanation of why this intent was classified */
+  reasoning?: string;
+}
+
+/**
+ * Classify user intent from voice transcript.
+ * Determines whether user wants to navigate or create a visualization.
+ */
+export async function classifyIntent(
+  request: IntentClassificationRequest,
+  platformId: string = DEFAULT_PLATFORM,
+): Promise<IntentClassificationResponse> {
+  const response = await fetch(
+    `${BASE_URL}/api/platforms/${platformId}/classify-intent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    throw new Error(
+      body.error ?? `Intent classification failed: ${response.status}`,
+    );
+  }
+
+  const json = (await response.json()) as {
+    data: IntentClassificationResponse;
+  };
+  return json.data;
+}
+
 // ── Voice Navigation API ─────────────────────────────────────────────────────
 
 export interface VoiceNavigationRequest {
