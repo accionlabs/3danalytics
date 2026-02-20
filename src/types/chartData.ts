@@ -74,6 +74,38 @@ export interface KpiCardItem {
   }
 }
 
+/** Single stage in a funnel chart */
+export interface FunnelStageItem {
+  /** Stage/step label */
+  label: string
+  /** Count/value for this stage */
+  value: number
+  /** Optional conversion rate (percentage) */
+  conversionRate?: number
+  /** Optional custom color */
+  color?: string
+}
+
+/** Single cohort row in a cohort retention heatmap */
+export interface CohortItem {
+  /** Cohort label (e.g., date, name) */
+  label: string
+  /** Retention percentages for each time period */
+  retention: number[]
+}
+
+/** Single region/category in a geographic chart */
+export interface GeoItem {
+  /** Region/location label */
+  label: string
+  /** Primary value (revenue, users, etc.) */
+  value: number
+  /** Optional secondary metric */
+  secondaryValue?: number
+  /** Optional custom color */
+  color?: string
+}
+
 /**
  * Optional field mapping configuration for data transformation.
  * Allows charts to adapt to different data shapes without code changes.

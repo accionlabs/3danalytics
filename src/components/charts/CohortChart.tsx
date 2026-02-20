@@ -1,5 +1,6 @@
+import { useMemo } from 'react'
 import type { ChartRendererProps } from '../../types/index.ts'
-import type { CohortRow } from '../../types/index.ts'
+import type { CohortItem } from '../../types/chartData.ts'
 
 function getColor(value: number): string {
   if (value >= 80) return '#10b981'
@@ -9,8 +10,51 @@ function getColor(value: number): string {
   return '#ef4444'
 }
 
-export function CohortChart({ data, width, height }: ChartRendererProps) {
-  const cohorts = data as CohortRow[]
+interface CohortChartProps extends ChartRendererProps {
+  /** Optional field mapping */
+  labelField?: string
+  retentionField?: string
+}
+
+/**
+ * Generic cohort retention heatmap with automatic data transformation.
+ * Visualizes retention rates across cohorts and time periods.
+ */
+export function CohortChart({
+  data,
+  width,
+  height,
+  labelField,
+  retentionField,
+}: CohortChartProps) {
+  // Transform raw data to CohortItem[]
+  const cohorts: CohortItem[] = useMemo(() => {
+    if (!Array.isArray(data)) return []
+
+    const labelKey = labelField || 'label'
+    const retentionKey = retentionField || 'retention'
+
+    return data.map((item, index) => {
+      const label =
+        item[labelKey] ||
+        item.cohort ||
+        item.name ||
+        item.period ||
+        `Cohort ${index + 1}`
+
+      let retention: number[] = []
+      if (Array.isArray(item[retentionKey])) {
+        retention = item[retentionKey].map((v: unknown) => Number(v) || 0)
+      } else if (Array.isArray(item.retention)) {
+        retention = item.retention.map((v: unknown) => Number(v) || 0)
+      } else if (Array.isArray(item.values)) {
+        retention = item.values.map((v: unknown) => Number(v) || 0)
+      }
+
+      return { label: String(label), retention }
+    })
+  }, [data, labelField, retentionField])
+
   const maxMonths = Math.max(...cohorts.map((c) => c.retention.length))
   const labelWidth = Math.round(width * 0.15)
   const headerHeight = Math.round(height * 0.08)
@@ -40,7 +84,7 @@ export function CohortChart({ data, width, height }: ChartRendererProps) {
 
       {/* Cohort rows */}
       {cohorts.map((cohort) => (
-        <div key={cohort.cohort} style={{ display: 'flex', alignItems: 'center' }}>
+        <div key={cohort.label} style={{ display: 'flex', alignItems: 'center' }}>
           <div
             style={{
               width: labelWidth,
@@ -51,7 +95,7 @@ export function CohortChart({ data, width, height }: ChartRendererProps) {
               flexShrink: 0,
             }}
           >
-            {cohort.cohort}
+            {cohort.label}
           </div>
           {cohort.retention.map((value, mi) => (
             <div
