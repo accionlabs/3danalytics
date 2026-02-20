@@ -6,6 +6,7 @@ import { FunnelChart } from './FunnelChart.tsx'
 import { KpiCard } from './KpiCard.tsx'
 import { GeoChart } from './GeoChart.tsx'
 import { BarChart } from './BarChart.tsx'
+import { StackedBarChart } from './StackedBarChart.tsx'
 import { EmbedPanel } from './EmbedPanel.tsx'
 
 registerChart('revenue', RevenueChart)
@@ -15,4 +16,5 @@ registerChart('funnel', FunnelChart)
 registerChart('kpi', KpiCard)
 registerChart('geo', GeoChart)
 registerChart('bar', BarChart)
+registerChart('stackedBar', StackedBarChart)
 registerChart('embed', EmbedPanel)

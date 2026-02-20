@@ -16,6 +16,24 @@ export interface BarItem {
   color?: string
 }
 
+/** Single bar in a stacked bar chart */
+export interface StackedBarPoint {
+  /** X-axis label (category, date, etc.) */
+  x: string
+  /** Y-values for each stacked series (key = series name, value = numeric value) */
+  [seriesKey: string]: string | number
+}
+
+/** Configuration for a stacked bar series */
+export interface StackedBarSeries {
+  /** Data key to extract y-value from StackedBarPoint */
+  key: string
+  /** Display label for legend */
+  label: string
+  /** Segment color (hex or CSS color) */
+  color: string
+}
+
 /** Single point in a multi-line chart */
 export interface LineChartPoint {
   /** X-axis label (date, category, etc.) */
