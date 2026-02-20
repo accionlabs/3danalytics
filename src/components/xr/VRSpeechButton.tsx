@@ -197,9 +197,9 @@ export function VRSpeechButton() {
 
   return (
     <group>
-      {/* Speech button */}
+      {/* Speech button - positioned on the right side to avoid panel overlap */}
       <Interactive onSelect={isDisabled ? undefined : handleClick}>
-        <mesh ref={buttonMeshRef} position={[0, 1.2, -2]}>
+        <mesh ref={buttonMeshRef} position={[1.5, 1.0, -2]}>
           <planeGeometry args={[0.6, 0.3]} />
           <meshBasicMaterial
             map={buttonTexture}
@@ -211,10 +211,10 @@ export function VRSpeechButton() {
         </mesh>
       </Interactive>
 
-      {/* Feedback display (shown during navigation) */}
+      {/* Feedback display (shown during navigation) - positioned below button on right */}
       {showFeedback && navMessage && (
-        <mesh ref={feedbackMeshRef} position={[0, 0.8, -2]}>
-          <planeGeometry args={[2, 0.25]} />
+        <mesh ref={feedbackMeshRef} position={[1.5, 0.6, -2]}>
+          <planeGeometry args={[1.5, 0.25]} />
           <meshBasicMaterial
             map={feedbackTexture}
             transparent
