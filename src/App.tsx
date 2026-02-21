@@ -70,8 +70,6 @@ export default function App() {
   const panels = useDashboardStore((s) => s.panels)
   const isLoading = useDashboardStore((s) => s.isLoading)
   const error = useDashboardStore((s) => s.error)
-  const currentInsights = useDashboardStore((s) => s.currentInsights)
-  const setCurrentInsights = useDashboardStore((s) => s.setCurrentInsights)
   const [helpOpen, setHelpOpen] = useState(false)
   const [minimapOpen, setMinimapOpen] = useState(false)
   const { isMobile, uiScale } = useViewport()
@@ -214,14 +212,6 @@ export default function App() {
 
       {/* Speech recognition button — only show in desktop mode, not in VR */}
       {!isInXR && <SpeechRecognitionButton uiScale={uiScale} />}
-
-      {/* Insights notification — shows key insights from voice-generated visualizations */}
-      {currentInsights && currentInsights.length > 0 && (
-        <InsightsNotification
-          insights={currentInsights}
-          onDismiss={() => setCurrentInsights(null)}
-        />
-      )}
     </div>
   )
 }
