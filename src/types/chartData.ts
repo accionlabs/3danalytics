@@ -52,6 +52,17 @@ export interface LineSeries {
   color: string
 }
 
+/**
+ * Revenue chart data format from API.
+ * Includes both data points and series configuration in a single object.
+ */
+export interface RevenueChartData {
+  /** Array of data points with x and series values */
+  points: LineChartPoint[]
+  /** Series configuration (which lines to render and their styling) */
+  series: LineSeries[]
+}
+
 /** Single point in an area chart */
 export interface AreaChartPoint {
   /** X-axis label */
