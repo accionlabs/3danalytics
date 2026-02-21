@@ -78,6 +78,8 @@ export interface DashboardState {
   isDragging: boolean
   isLoading: boolean
   error: string | null
+  // Voice insights notification
+  currentInsights: string[] | null
   // Actions
   setPanels: (panels: PanelConfig[]) => void
   setCausalLinks: (links: CausalLink[]) => void
@@ -92,6 +94,7 @@ export interface DashboardState {
   navigateToStep: (index: number) => void
   setTransitioning: (isTransitioning: boolean) => void
   setDragging: (isDragging: boolean) => void
+  setCurrentInsights: (insights: string[] | null) => void
   handleVoiceNavigation: (transcript: string) => Promise<{ success: boolean; panelId?: string; error?: string }>
 }
 
