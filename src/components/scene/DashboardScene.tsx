@@ -213,8 +213,8 @@ export function DashboardScene() {
             )
           })}
           <Connectors links={causalLinks} positionMap={vrPositionMap} />
+          <VRHUD />
         </VRNavigation>
-        <VRHUD />
         <VRSpeechButton />
         <VRComfortVignette />
         <PostProcessing />
