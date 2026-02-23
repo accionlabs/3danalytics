@@ -2,7 +2,7 @@ import type { PanelConfig, PanelPosition } from '../types/index.ts'
 
 const X_SPACING = 4
 const Y_SPACING = 3
-export const Z_SPACING = 4
+export const Z_SPACING = 6  // Increased spacing between detail levels for better VR depth perception
 const Z_BASE = -8
 
 /**

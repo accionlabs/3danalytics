@@ -172,27 +172,47 @@ export function DashboardScene() {
   // NOTE: drei <Text> (troika-three-text) breaks XR rendering — all text
   // uses CanvasTexture on plane meshes instead.
   if (isInXR) {
+    // VR-specific adjustments for comfortable viewing
+    // Lift panels to eye level and position at comfortable distance
+    const VR_Y_OFFSET = 0.5   // Lift panels 0.5m above center for comfortable viewing
+    const VR_Z_OFFSET = -2    // Push panels further back for comfortable viewing distance (3-5m)
+
+    // Create VR-adjusted position map for connectors
+    const vrPositionMap = new Map<string, (typeof allPositions)[number]>()
+    positionMap.forEach((pos, id) => {
+      vrPositionMap.set(id, {
+        position: [
+          pos.position[0],
+          pos.position[1] + VR_Y_OFFSET,
+          pos.position[2] + VR_Z_OFFSET
+        ] as [number, number, number],
+        rotation: pos.rotation,
+        scale: pos.scale
+      })
+    })
+
     return (
       <>
         <XROrigin position={[0, 0, 0]} />
         <VRNavigation>
           <VRDebugDisplay />
           <Environment />
-          <VRAxisLabels />
+          <VRAxisLabels yOffset={VR_Y_OFFSET} zOffset={VR_Z_OFFSET} />
           {panels.map((panel) => {
-            const pos = positionMap.get(panel.id)
-            if (!pos) return null
+            const vrPos = vrPositionMap.get(panel.id)
+            if (!vrPos) return null
+
             return (
               <VRPanel
                 key={panel.id}
                 config={panel}
-                position={pos.position}
+                position={vrPos.position}
                 isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
                 onClick={() => handlePanelClick(panel.id)}
               />
             )
           })}
-          <Connectors links={causalLinks} positionMap={positionMap} />
+          <Connectors links={causalLinks} positionMap={vrPositionMap} />
         </VRNavigation>
         <VRHUD />
         <VRSpeechButton />

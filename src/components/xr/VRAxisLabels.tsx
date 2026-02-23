@@ -32,7 +32,7 @@ function makeTextTexture(text: string, color: string): THREE.CanvasTexture {
  * NOTE: Uses CanvasTexture on plane meshes instead of drei <Text>,
  * which breaks XR rendering (scene moves with user's head).
  */
-export function VRAxisLabels() {
+export function VRAxisLabels({ yOffset = 0, zOffset = 0 }: { yOffset?: number; zOffset?: number }) {
   const panels = useDashboardStore((s) => s.panels)
 
   const labels = useMemo(() => {
@@ -55,7 +55,7 @@ export function VRAxisLabels() {
         const maxY = Math.max(...columnPanels.map(({ pos: p }) => p[1]))
         result.push({
           text: panel.processLabel,
-          position: [pos[0], maxY + 0.8, pos[2]],
+          position: [pos[0], maxY + 0.8 + yOffset, pos[2] + zOffset],
           axis: 'x',
         })
       }
@@ -69,14 +69,14 @@ export function VRAxisLabels() {
         const minX = Math.min(...rowPanels.map(({ pos: p }) => p[0]))
         result.push({
           text: panel.segmentLabel,
-          position: [minX - 1.2, pos[1], pos[2]],
+          position: [minX - 1.2, pos[1] + yOffset, pos[2] + zOffset],
           axis: 'y',
         })
       }
     })
 
     return result
-  }, [panels])
+  }, [panels, yOffset, zOffset])
 
   // Memoize textures so they don't regenerate every render
   const textures = useMemo(
