@@ -58,12 +58,53 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
       if (!ChartComponent) continue
 
       const wrapper = document.createElement('div')
-      wrapper.style.cssText = `position:absolute;width:${TEX_SIZE}px;height:${TEX_SIZE}px;background:#080c1c;font-family:system-ui,sans-serif;`
+      wrapper.style.cssText = `position:absolute;width:${TEX_SIZE}px;height:${TEX_SIZE}px;background:transparent;font-family:system-ui,sans-serif;`
       container.appendChild(wrapper)
+
+      // Calculate dimensions for title bar and chart content
+      const titleBarHeight = 40
+      const titlePadding = 10
+      const contentPadding = 12
+      const chartWidth = TEX_SIZE - contentPadding * 2
+      const chartHeight = TEX_SIZE - titleBarHeight - contentPadding * 2
 
       const root = createRoot(wrapper)
       root.render(
-        <ChartComponent data={panel.data} width={TEX_SIZE} height={TEX_SIZE} />,
+        <div
+          style={{
+            width: TEX_SIZE,
+            height: TEX_SIZE,
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: '10px',
+            border: '1px solid rgba(40, 60, 100, 0.4)',
+            background: 'rgba(8, 12, 28, 0.92)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Title bar - matching web version style */}
+          <div
+            style={{
+              padding: `${titlePadding}px ${titlePadding + 4}px`,
+              borderBottom: '1px solid rgba(40, 60, 100, 0.3)',
+              color: '#c0d8f0',
+              fontSize: '18px',
+              fontWeight: 700,
+              textShadow: '0 0 8px rgba(96, 160, 255, 0.4)',
+              background: 'rgba(10, 15, 30, 0.8)',
+              height: titleBarHeight,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            {panel.title}
+          </div>
+
+          {/* Chart content */}
+          <div style={{ padding: `${contentPadding}px`, flex: 1 }}>
+            <ChartComponent data={panel.data} width={chartWidth} height={chartHeight} />
+          </div>
+        </div>,
       )
 
       // Allow React + useEffect to commit, then capture.
@@ -74,26 +115,52 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
         const chartCanvas = wrapper.querySelector('canvas') as HTMLCanvasElement | null
 
         if (chartCanvas) {
-          // Fast path: D3/canvas chart — copy pixels directly into a standalone
-          // canvas so the texture stays valid after React unmounts the component.
+          // Canvas-based chart - create composite texture with title bar
           const offscreen = document.createElement('canvas')
-          offscreen.width = chartCanvas.width
-          offscreen.height = chartCanvas.height
-          const copyCtx = offscreen.getContext('2d')
-          if (copyCtx) {
-            copyCtx.drawImage(chartCanvas, 0, 0)
+          offscreen.width = TEX_SIZE
+          offscreen.height = TEX_SIZE
+          const ctx = offscreen.getContext('2d')
 
-            // Sanity check: verify canvas has content (not blank due to race condition)
-            const sample = copyCtx.getImageData(0, 0, Math.min(100, offscreen.width), Math.min(100, offscreen.height))
+          if (ctx) {
+            // Draw panel background
+            ctx.fillStyle = 'rgba(8, 12, 28, 0.92)'
+            ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE)
+
+            // Draw title bar background
+            ctx.fillStyle = 'rgba(10, 15, 30, 0.8)'
+            ctx.fillRect(0, 0, TEX_SIZE, titleBarHeight)
+
+            // Draw title bar border
+            ctx.strokeStyle = 'rgba(40, 60, 100, 0.3)'
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(0, titleBarHeight)
+            ctx.lineTo(TEX_SIZE, titleBarHeight)
+            ctx.stroke()
+
+            // Draw title text
+            ctx.fillStyle = '#c0d8f0'
+            ctx.font = 'bold 18px system-ui, sans-serif'
+            ctx.textBaseline = 'middle'
+            ctx.shadowColor = 'rgba(96, 160, 255, 0.4)'
+            ctx.shadowBlur = 8
+            ctx.fillText(panel.title, 14, titleBarHeight / 2)
+            ctx.shadowBlur = 0
+
+            // Draw chart canvas below title bar
+            const chartY = titleBarHeight + contentPadding
+            ctx.drawImage(chartCanvas, contentPadding, chartY, chartWidth, chartHeight)
+
+            // Verify content
+            const sample = ctx.getImageData(0, 0, Math.min(100, TEX_SIZE), Math.min(100, TEX_SIZE))
             const hasContent = sample.data.some((val, i) => i % 4 === 3 && val > 10)
 
             if (hasContent) {
               const texture = new THREE.CanvasTexture(offscreen)
               texture.needsUpdate = true
               setVRTexture(panel.id, texture)
-              console.log(`[OffscreenChartRenderer] Canvas texture: ${panel.title}`)
+              console.log(`[OffscreenChartRenderer] Canvas texture with title: ${panel.title}`)
             } else {
-              console.warn(`[OffscreenChartRenderer] Canvas empty for ${panel.title}, using fallback`)
               setVRTexture(panel.id, createFallbackTexture(panel.title))
             }
           } else {
@@ -102,7 +169,7 @@ export function OffscreenChartRenderer({ panels, active }: OffscreenChartRendere
           root.unmount()
           wrapper.remove()
         } else {
-          // Fallback path: HTML-based chart — serialise to SVG then to texture
+          // HTML-based chart - use SVG path
           const svgStr = htmlToSvgString(wrapper, TEX_SIZE, TEX_SIZE)
           svgToTexture(svgStr, TEX_SIZE, TEX_SIZE)
             .then((texture) => {
