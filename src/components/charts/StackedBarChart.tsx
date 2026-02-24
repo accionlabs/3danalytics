@@ -16,6 +16,14 @@ const DEFAULT_SERIES: StackedBarSeries[] = [
   { key: 'series3', label: 'Series 3', color: '#f43f5e' },
 ]
 
+// Default mock data when no data is provided
+const DEFAULT_DATA = [
+  { label: 'Account A', series1: 45, series2: 30, series3: 25 },
+  { label: 'Account B', series1: 35, series2: 40, series3: 15 },
+  { label: 'Account C', series1: 55, series2: 25, series3: 20 },
+  { label: 'Account D', series1: 30, series2: 35, series3: 35 },
+]
+
 /**
  * Generic stacked bar chart component with automatic data transformation.
  * Detects numeric fields and renders them as stacked segments within each bar.
@@ -30,20 +38,40 @@ export function StackedBarChart({
 }: StackedBarChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
+  // Handle nested data structure: { points: [...], series: [...] } or direct array
+  const { effectiveData, dataSeries } = useMemo(() => {
+    // Check if data is nested object with 'points' property
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      const nested = data as { points?: unknown[]; series?: StackedBarSeries[] }
+      return {
+        effectiveData: Array.isArray(nested.points) && nested.points.length > 0 ? nested.points : DEFAULT_DATA,
+        dataSeries: nested.series,
+      }
+    }
+    // Direct array format
+    if (Array.isArray(data) && data.length > 0) {
+      return { effectiveData: data, dataSeries: undefined }
+    }
+    return { effectiveData: DEFAULT_DATA, dataSeries: undefined }
+  }, [data])
+
   // Auto-detect series if not provided
   const series = useMemo(() => {
+    // Priority: prop > data.series > auto-detect > default
     if (customSeries) return customSeries
+    if (dataSeries) return dataSeries
 
     // If no custom series, try to detect numeric fields from first data item
-    if (Array.isArray(data) && data.length > 0) {
-      const firstItem = data[0]
+    if (effectiveData.length > 0) {
+      const firstItem = effectiveData[0]
       const detectedSeries: StackedBarSeries[] = []
       const colors = ['#3b82f6', '#10b981', '#f43f5e', '#8b5cf6', '#f59e0b']
 
       Object.keys(firstItem).forEach((key, i) => {
         const value = firstItem[key]
         // Skip x-axis field and non-numeric fields
-        if (key === (xField || 'label') || typeof value !== 'number') return
+        const xAxisField = xField || 'x'
+        if (key === xAxisField || key === 'label' || key === 'x' || typeof value !== 'number') return
 
         detectedSeries.push({
           key,
@@ -56,20 +84,18 @@ export function StackedBarChart({
     }
 
     return DEFAULT_SERIES
-  }, [customSeries, data, xField])
+  }, [customSeries, dataSeries, effectiveData, xField])
 
   // Transform raw data to StackedBarPoint[]
   const chartData: StackedBarPoint[] = useMemo(() => {
-    if (!Array.isArray(data)) return []
+    const xKey = xField || 'x'
 
-    const xKey = xField || 'label'
-
-    return data.map((item, index) => {
+    return effectiveData.map((item, index) => {
       const x =
         item[xKey] ||
+        item.x ||
         item.label ||
         item.month ||
-        item.x ||
         item.date ||
         item.category ||
         `Item ${index + 1}`
@@ -84,7 +110,7 @@ export function StackedBarChart({
 
       return point
     })
-  }, [data, series, xField])
+  }, [effectiveData, series, xField])
 
   useEffect(() => {
     const canvas = canvasRef.current
