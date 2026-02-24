@@ -268,9 +268,9 @@ export function DashboardScene() {
       };
 
       // Step 3: Position each panel
-      // For side groups, we use a FIXED Z position (at user's eye level)
-      // so they don't overlap with main group's detail levels
-      const SIDE_GROUP_Z = -3;  // Fixed Z for side groups (comfortable viewing distance)
+      // For side groups, position panels along their LOCAL depth axis (not world Z)
+      // This ensures summary cards appear in front of detail views after rotation
+      const SIDE_GROUP_BASE_Z = -3;  // Base Z position for side groups
 
       positionMap.forEach((pos, id) => {
         const panel = panels.find(p => p.id === id);
@@ -282,7 +282,7 @@ export function DashboardScene() {
         // Calculate panel position relative to its group center
         const relativeX = pos.position[0] - groupCenterX;
         const relativeY = pos.position[1];
-        const relativeZ = pos.position[2];
+        const relativeZ = pos.position[2];  // grammarLayout Z (0 for summary, negative for details)
 
         let finalX: number;
         let finalY: number;
@@ -294,11 +294,25 @@ export function DashboardScene() {
           finalY = relativeY + VR_Y_OFFSET;
           finalZ = relativeZ + VR_Z_OFFSET;
         } else {
-          // Side groups: Use FIXED Z position at user's eye level
-          // Panels are arranged horizontally (by relativeX) but all at same Z depth
-          finalX = relativeX + transform.offsetX;
+          // Side groups: Position panels along their LOCAL depth axis
+          // relativeZ: 0 for summary (detailLevel 0), negative for details (detailLevel 1+)
+          // We flip the sign so summary is closer to user after rotation
+          const localDepth = -relativeZ;  // Flip: summary=0, detail=+4 (further from panel surface)
+
+          // Get the rotation angle for this group
+          const angleRad = groupIndex === 1
+            ? -GROUP_ANGLE * Math.PI / 180
+            : GROUP_ANGLE * Math.PI / 180;
+
+          // Position along the panel's facing direction (local -Z becomes world offset)
+          // For left group (angle=-85°): sin=-0.996, cos=0.087
+          // Detail panels (localDepth=4) will be at X offset = -3.98 (further from user)
+          const depthOffsetX = Math.sin(angleRad) * localDepth;
+          const depthOffsetZ = -Math.cos(angleRad) * localDepth;
+
+          finalX = relativeX + transform.offsetX + depthOffsetX;
           finalY = relativeY + VR_Y_OFFSET;
-          finalZ = SIDE_GROUP_Z;  // Fixed Z - no grammarLayout depth, no offsetZ
+          finalZ = SIDE_GROUP_BASE_Z + depthOffsetZ;
         }
 
         console.log(`[VR Position] Panel ${id}: groupId=${groupId}, groupIndex=${groupIndex}, finalX=${finalX.toFixed(2)}, finalZ=${finalZ.toFixed(2)}`);

@@ -378,6 +378,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           groupId: newPanels[0]?.visualizationGroupId
         });
 
+        // Generate causalLinks from parentId relationships in new panels
+        const newLinks: CausalLink[] = newPanels
+          .filter(p => p.parentId)
+          .map(p => ({
+            from: p.parentId!,
+            to: p.id,
+            type: 'hierarchy' as const,
+          }));
+
+        console.log('[VoiceViz] Generated causalLinks:', newLinks.length);
+
         // VR mode logic: ALWAYS append unless it's the very first group
         // Desktop mode: Always replace to prevent overlapping
         if (effectiveVRMode) {
@@ -385,6 +396,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             // VR mode with existing panels: Append new group
             console.log('[VoiceViz] VR mode - APPENDING new group to existing panels');
             const combinedPanels = [...existingPanels, ...newPanels];
+            const existingLinks = get().causalLinks;
+            const combinedLinks = [...existingLinks, ...newLinks];
+
             console.log('[VoiceViz] Combined panels:', {
               total: combinedPanels.length,
               groups: [...new Set(combinedPanels.map(p => p.visualizationGroupId ?? 0))]
@@ -393,6 +407,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             set({
               panels: combinedPanels,
               visiblePanelIds: allPanelIds(combinedPanels),
+              causalLinks: combinedLinks,
             });
 
             // Don't auto-focus - let user manually turn head to see new group
@@ -403,6 +418,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             set({
               panels: newPanels,
               visiblePanelIds: allPanelIds(newPanels),
+              causalLinks: newLinks,
             });
 
             // Navigate to the first generated panel
@@ -417,6 +433,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           set({
             panels: newPanels,
             visiblePanelIds: allPanelIds(newPanels),
+            causalLinks: newLinks,
           });
 
           // Navigate to the first generated panel in desktop mode
