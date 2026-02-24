@@ -3,7 +3,7 @@ import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useXR, XROrigin } from '@react-three/xr'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
-import { grammarLayout, Z_SPACING } from '../../layouts/grammarLayout.ts'
+import { grammarLayout, Z_SPACING, Z_BASE } from '../../layouts/grammarLayout.ts'
 import { DashboardPanel } from './DashboardPanel.tsx'
 import { VRPanel } from '../xr/VRPanel.tsx'
 import { VRNavigation } from '../xr/VRNavigation.tsx'
@@ -235,78 +235,88 @@ export function DashboardScene() {
       }
 
       // Step 2: Define group transforms (position + rotation)
-      // Groups are arranged in an arc: front, left, right
-      const GROUP_DISTANCE = 8;  // Distance from user for side groups (increased for more separation)
-      const GROUP_ANGLE = 85;    // Angle in degrees from center (closer to 90° for clear left/right)
+      // Grammar Dimension Mapping:
+      // X: Horizontal flow (process_step)
+      // Y: Vertical spread (segment)
+      // Z: Depth layers (detail_level) 
+      const GROUP_DISTANCE = 8;
+      const GROUP_ANGLE = 85;
 
       const getGroupTransform = (groupId: number) => {
         const groupIndex = sortedGroups.indexOf(groupId);
 
         if (groupIndex === 0) {
-          // First group: Front center
+          // Main group: Front center
           return { offsetX: 0, offsetZ: 0, rotationY: 0 };
         }
-        if (groupIndex === 1) {
-          // Second group: Left
-          const angleRad = -GROUP_ANGLE * Math.PI / 180;
-          return {
-            offsetX: Math.sin(angleRad) * GROUP_DISTANCE,  // Negative (left)
-            offsetZ: (Math.cos(angleRad) - 1) * GROUP_DISTANCE,  // Slight Z adjustment
-            rotationY: -angleRad  // Rotate to face user
-          };
-        }
-        if (groupIndex === 2) {
-          // Third group: Right
-          const angleRad = GROUP_ANGLE * Math.PI / 180;
-          return {
-            offsetX: Math.sin(angleRad) * GROUP_DISTANCE,  // Positive (right)
-            offsetZ: (Math.cos(angleRad) - 1) * GROUP_DISTANCE,  // Slight Z adjustment
-            rotationY: -angleRad  // Rotate to face user
-          };
-        }
-        return { offsetX: 0, offsetZ: 0, rotationY: 0 };
+
+        // Side groups: Position in arc around origin [0,0,0]
+        const angleRad = (groupIndex === 1 ? -GROUP_ANGLE : GROUP_ANGLE) * Math.PI / 180;
+        return {
+          offsetX: Math.sin(angleRad) * GROUP_DISTANCE,
+          offsetZ: (Math.cos(angleRad) - 1) * GROUP_DISTANCE,
+          rotationY: -angleRad
+        };
       };
 
-      // Step 3: Position each panel
-      // For side groups, we use a FIXED Z position (at user's eye level)
-      // so they don't overlap with main group's detail levels
-      const SIDE_GROUP_Z = -3;  // Fixed Z for side groups (comfortable viewing distance)
+      // Step 3: Position each panel using the Unified Semantic Grammar
+      // Rule: Same X, Same Y, Different Z -> Depth layers (Detail drill-down)
+      const SIDE_GROUP_Z = -3;
 
       positionMap.forEach((pos, id) => {
         const panel = panels.find(p => p.id === id);
-        const groupId = panel?.visualizationGroupId ?? 0;
+        if (!panel) return;
+
+        const groupId = panel.visualizationGroupId ?? 0;
         const groupIndex = sortedGroups.indexOf(groupId);
         const groupCenterX = groupCentersX.get(groupId) ?? 0;
         const transform = getGroupTransform(groupId);
+        const isFocused = focusedPanelId === id;
 
-        // Calculate panel position relative to its group center
-        const relativeX = pos.position[0] - groupCenterX;
-        const relativeY = pos.position[1];
-        const relativeZ = pos.position[2];
+        // --- GRAMMAR COORDINATES (Local to group) ---
+        // Horizontal (X), Vertical (Y), Depth (Z)
+        const localX = pos.position[0] - groupCenterX;
+        const localY = pos.position[1];
 
-        let finalX: number;
-        let finalY: number;
-        let finalZ: number;
+        // Rule: Same X, Same Y, Different Z = Depth layers.
+        // Secondary Channel: Anomaly spotlight has a 'Z-pull' toward the user.
+        const localZ = -(panel.semantic.detailLevel * Z_SPACING) + (isFocused ? 1.0 : 0);
 
-        if (groupIndex === 0) {
-          // Main group: Keep grammarLayout Z positions (detail levels)
-          finalX = relativeX + transform.offsetX;
-          finalY = relativeY + VR_Y_OFFSET;
-          finalZ = relativeZ + VR_Z_OFFSET;
-        } else {
-          // Side groups: Use FIXED Z position at user's eye level
-          // Panels are arranged horizontally (by relativeX) but all at same Z depth
-          finalX = relativeX + transform.offsetX;
-          finalY = relativeY + VR_Y_OFFSET;
-          finalZ = SIDE_GROUP_Z;  // Fixed Z - no grammarLayout depth, no offsetZ
+        // Focal Channel Rule: Complementary (facets) use angular rotation around focal point
+        // (Detecting panels with same address and group)
+        const siblingsAtSameAddress = panels.filter(p =>
+          (p.visualizationGroupId ?? 0) === groupId &&
+          p.semantic.processStep === panel.semantic.processStep &&
+          p.semantic.segment === panel.semantic.segment &&
+          p.semantic.detailLevel === panel.semantic.detailLevel
+        );
+        let facetRotationY = 0;
+        if (siblingsAtSameAddress.length > 1) {
+          const indexInRange = siblingsAtSameAddress.findIndex(p => p.id === id);
+          facetRotationY = (indexInRange - (siblingsAtSameAddress.length - 1) / 2) * (20 * Math.PI / 180);
         }
 
-        console.log(`[VR Position] Panel ${id}: groupId=${groupId}, groupIndex=${groupIndex}, finalX=${finalX.toFixed(2)}, finalZ=${finalZ.toFixed(2)}`);
+        // --- WORLD TRANSFORMATION ---
+        const groupOrigin = new THREE.Vector3();
+        if (groupIndex === 0) {
+          // Front group uses Z_BASE + VR_Z_OFFSET as its front plane anchor
+          groupOrigin.set(0, VR_Y_OFFSET, VR_Z_OFFSET + Z_BASE);
+        } else {
+          // Side groups use fixed SIDE_GROUP_Z as their front plane anchor
+          // Note: we preserve the current offsetZ=0 behavior if preferred, but adding curvature here
+          groupOrigin.set(transform.offsetX, VR_Y_OFFSET, SIDE_GROUP_Z + transform.offsetZ);
+        }
+
+        const worldPos = new THREE.Vector3(localX, localY, localZ)
+          .applyAxisAngle(new THREE.Vector3(0, 1, 0), transform.rotationY)
+          .add(groupOrigin);
+
+        console.log(`[VR Position] Panel ${id}: groupId=${groupId}, pos=[${worldPos.x.toFixed(2)}, ${worldPos.y.toFixed(2)}, ${worldPos.z.toFixed(2)}]`);
 
         vrPositionMap.set(id, {
-          position: [finalX, finalY, finalZ] as [number, number, number],
-          rotation: [0, transform.rotationY, 0] as [number, number, number],
-          scale: pos.scale
+          position: [worldPos.x, worldPos.y, worldPos.z] as [number, number, number],
+          rotation: [0, transform.rotationY + facetRotationY, 0] as [number, number, number],
+          scale: isFocused ? 1.15 : pos.scale // Secondary Channel: Spotlight scale
         });
       });
     }
@@ -328,6 +338,8 @@ export function DashboardScene() {
                 config={panel}
                 position={vrPos.position}
                 rotation={vrPos.rotation}
+                scale={vrPos.scale}
+                isFocused={focusedPanelId === panel.id}
                 isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
                 onClick={() => handlePanelClick(panel.id)}
               />

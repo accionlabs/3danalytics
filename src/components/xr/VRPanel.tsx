@@ -8,7 +8,9 @@ interface VRPanelProps {
   config: PanelConfig
   position: [number, number, number]
   rotation?: [number, number, number]
+  scale?: number
   isDimmed: boolean
+  isFocused?: boolean
   onClick: () => void
 }
 
@@ -39,10 +41,20 @@ export function setVRTexture(panelId: string, texture: THREE.CanvasTexture): voi
  * Uses module-level cached textures that survive React lifecycle.
  * Checks for texture updates imperatively in useFrame (no React re-renders).
  *
- * NOTE: drei <Text> (troika-three-text) breaks XR rendering — it causes
- * the scene to move with the user's head. Use CanvasTexture for text instead.
+ * NOTE: drei <Text> (troika-three-text) breaks XR rendering.
+ *
+ * Implements Grammar Secondary Channels:
+ * - Anomaly (spotlight): scale and glow (bright border)
  */
-export function VRPanel({ config, position, rotation, isDimmed, onClick }: VRPanelProps) {
+export function VRPanel({
+  config,
+  position,
+  rotation,
+  scale = 1,
+  isDimmed,
+  isFocused,
+  onClick
+}: VRPanelProps) {
   const width = config.size.width
   const height = config.size.height
   const opacity = isDimmed ? 0.3 : 1
@@ -66,8 +78,12 @@ export function VRPanel({ config, position, rotation, isDimmed, onClick }: VRPan
     }
   })
 
+  // Theme colors for "Glow" (focused spotlight)
+  const borderColor = isFocused ? '#00f2ff' : '#5080c0'
+  const borderOpacity = isFocused ? 1 : opacity * 0.8
+
   return (
-    <group position={position} rotation={rotation}>
+    <group position={position} rotation={rotation} scale={scale}>
       {/* Panel plane with texture */}
       <mesh onClick={onClick}>
         <planeGeometry args={[width, height]} />
@@ -81,10 +97,18 @@ export function VRPanel({ config, position, rotation, isDimmed, onClick }: VRPan
         />
       </mesh>
 
-      {/* Border outline */}
+      {/* Border outline - implements anomaly glow */}
       <lineSegments geometry={edgesGeo}>
-        <lineBasicMaterial color="#5080c0" transparent opacity={opacity * 0.8} />
+        <lineBasicMaterial color={borderColor} transparent opacity={borderOpacity} />
       </lineSegments>
+
+      {/* Optional: subtle self-glow for focused panels */}
+      {isFocused && (
+        <mesh scale={1.02}>
+          <planeGeometry args={[width, height]} />
+          <meshBasicMaterial color="#00f2ff" transparent opacity={0.15} side={THREE.DoubleSide} />
+        </mesh>
+      )}
     </group>
   )
 }
