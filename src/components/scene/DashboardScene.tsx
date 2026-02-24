@@ -239,8 +239,8 @@ export function DashboardScene() {
       // X: Horizontal flow (process_step)
       // Y: Vertical spread (segment)
       // Z: Depth layers (detail_level) 
-      const GROUP_DISTANCE = 8;
-      const GROUP_ANGLE = 85;
+      const GROUP_DISTANCE = 10;
+      const GROUP_ANGLE = 90;
 
       const getGroupTransform = (groupId: number) => {
         const groupIndex = sortedGroups.indexOf(groupId);
@@ -261,7 +261,7 @@ export function DashboardScene() {
 
       // Step 3: Position each panel using the Unified Semantic Grammar
       // Rule: Same X, Same Y, Different Z -> Depth layers (Detail drill-down)
-      const SIDE_GROUP_Z = -3;
+      const SIDE_GROUP_Z = 5;
 
       positionMap.forEach((pos, id) => {
         const panel = panels.find(p => p.id === id);
