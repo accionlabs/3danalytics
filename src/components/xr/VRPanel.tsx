@@ -7,6 +7,7 @@ import { createFallbackTexture } from '../../xr/fallbackTexture.ts'
 interface VRPanelProps {
   config: PanelConfig
   position: [number, number, number]
+  rotation?: [number, number, number]
   isDimmed: boolean
   onClick: () => void
 }
@@ -41,7 +42,7 @@ export function setVRTexture(panelId: string, texture: THREE.CanvasTexture): voi
  * NOTE: drei <Text> (troika-three-text) breaks XR rendering — it causes
  * the scene to move with the user's head. Use CanvasTexture for text instead.
  */
-export function VRPanel({ config, position, isDimmed, onClick }: VRPanelProps) {
+export function VRPanel({ config, position, rotation, isDimmed, onClick }: VRPanelProps) {
   const width = config.size.width
   const height = config.size.height
   const opacity = isDimmed ? 0.3 : 1
@@ -66,7 +67,7 @@ export function VRPanel({ config, position, isDimmed, onClick }: VRPanelProps) {
   })
 
   return (
-    <group position={position}>
+    <group position={position} rotation={rotation}>
       {/* Panel plane with texture */}
       <mesh onClick={onClick}>
         <planeGeometry args={[width, height]} />

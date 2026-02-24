@@ -26,6 +26,7 @@ export interface PanelConfig {
   parentId?: string           // Z-axis parent panel
   segmentLabel?: string       // "Enterprise", "SMB", "Startup"
   processLabel?: string       // "Marketing", "Leads", "Pipeline"
+  visualizationGroupId?: number // Group ID for VR mode - multiple visualizations can coexist
 }
 
 /** Chart renderer contract — any chart component must satisfy this */
@@ -78,6 +79,7 @@ export interface DashboardState {
   isDragging: boolean
   isLoading: boolean
   error: string | null
+  isInVR: boolean
   // Voice insights notification
   currentInsights: string[] | null
   // Actions
@@ -85,6 +87,7 @@ export interface DashboardState {
   setCausalLinks: (links: CausalLink[]) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
+  setInVR: (isInVR: boolean) => void
   focusPanel: (id: string) => void
   unfocus: () => void
   navigateTo: (panelId: string, axis: 'x' | 'y' | 'z') => void

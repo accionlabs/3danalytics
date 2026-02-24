@@ -24,6 +24,14 @@ export function VRSpeechButton() {
     useSpeechRecorder({ forceWhisper: true }) // Always use Whisper in VR
 
   const handleVoiceNavigation = useDashboardStore((s) => s.handleVoiceNavigation)
+  const setInVR = useDashboardStore((s) => s.setInVR)
+
+  // Ensure isInVR is set to true when this component is mounted
+  // (This component only exists in VR mode, so we can safely set it)
+  useEffect(() => {
+    setInVR(true)
+    return () => setInVR(false) // Clean up when leaving VR
+  }, [setInVR])
 
   // Button canvas texture
   const buttonCanvas = useMemo(() => {

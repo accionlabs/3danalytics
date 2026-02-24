@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef } from 'react'
+import { useMemo, useCallback, useRef, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useXR, XROrigin } from '@react-three/xr'
@@ -75,7 +75,13 @@ export function DashboardScene() {
   const causalLinks = useDashboardStore((s) => s.causalLinks)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
+  const setInVR = useDashboardStore((s) => s.setInVR)
   const gl = useThree((s) => s.gl)
+
+  // Track VR mode in store for voice command handling
+  useEffect(() => {
+    setInVR(isInXR)
+  }, [isInXR, setInVR])
 
   void gl // suppress unused warning — gl is accessed via useThree() below
 
@@ -177,19 +183,133 @@ export function DashboardScene() {
     const VR_Y_OFFSET = 0.5   // Lift panels 0.5m above center for comfortable viewing
     const VR_Z_OFFSET = -2    // Push panels further back for comfortable viewing distance (3-5m)
 
-    // Create VR-adjusted position map for connectors
-    const vrPositionMap = new Map<string, (typeof allPositions)[number]>()
-    positionMap.forEach((pos, id) => {
-      vrPositionMap.set(id, {
-        position: [
-          pos.position[0],
-          pos.position[1] + VR_Y_OFFSET,
-          pos.position[2] + VR_Z_OFFSET
-        ] as [number, number, number],
-        rotation: pos.rotation,
-        scale: pos.scale
-      })
-    })
+    // VR Group Positioning Strategy:
+    // - Radial/Arc Layout: Groups are positioned in a circular arc around the user
+    // - Group 0: Front (0°), Group 1: Front-left (-60°), Group 2: Front-right (+60°), etc.
+    // - Each group maintains its internal grammarLayout semantic structure
+    const vrPositionMap = new Map<string, (typeof allPositions)[number]>();
+    const uniqueGroups = [...new Set(panels.map(p => p.visualizationGroupId ?? 0))];
+
+    console.log('[VR Groups] DEBUG:', {
+      totalPanels: panels.length,
+      uniqueGroups: uniqueGroups,
+      groupCount: uniqueGroups.length
+    });
+
+    // Only apply arc positioning if there are multiple groups
+    if (uniqueGroups.length === 1 && uniqueGroups[0] === 0) {
+      console.log('[VR Groups] Single group mode - using simple offset');
+      // Single group (original panels) - use simple offset (original behavior)
+      positionMap.forEach((pos, id) => {
+        vrPositionMap.set(id, {
+          position: [
+            pos.position[0],
+            pos.position[1] + VR_Y_OFFSET,
+            pos.position[2] + VR_Z_OFFSET
+          ] as [number, number, number],
+          rotation: pos.rotation,
+          scale: pos.scale
+        });
+      });
+    } else {
+      console.log('[VR Groups] Multi-group mode - using CENTERED radial positioning');
+
+      // Sort groups to get consistent ordering (0, 1, 2, ...)
+      const sortedGroups = [...uniqueGroups].sort((a, b) => a - b);
+      console.log('[VR Groups] Sorted groups:', sortedGroups);
+
+      // Step 1: Calculate the center X position of each group's panels
+      // This ensures symmetric positioning regardless of grammarLayout offsets
+      const groupCentersX = new Map<number, number>();
+      for (const groupId of uniqueGroups) {
+        const groupPanelIds = panels
+          .filter(p => (p.visualizationGroupId ?? 0) === groupId)
+          .map(p => p.id);
+        const groupXPositions = groupPanelIds
+          .map(id => positionMap.get(id)?.position[0] ?? 0);
+        const centerX = groupXPositions.length > 0
+          ? groupXPositions.reduce((a, b) => a + b, 0) / groupXPositions.length
+          : 0;
+        groupCentersX.set(groupId, centerX);
+        console.log(`[VR Groups] Group ${groupId} center X: ${centerX}`);
+      }
+
+      // Step 2: Define group transforms (position + rotation)
+      // Groups are arranged in an arc: front, left, right
+      const GROUP_DISTANCE = 8;  // Distance from user for side groups (increased for more separation)
+      const GROUP_ANGLE = 85;    // Angle in degrees from center (closer to 90° for clear left/right)
+
+      const getGroupTransform = (groupId: number) => {
+        const groupIndex = sortedGroups.indexOf(groupId);
+
+        if (groupIndex === 0) {
+          // First group: Front center
+          return { offsetX: 0, offsetZ: 0, rotationY: 0 };
+        }
+        if (groupIndex === 1) {
+          // Second group: Left
+          const angleRad = -GROUP_ANGLE * Math.PI / 180;
+          return {
+            offsetX: Math.sin(angleRad) * GROUP_DISTANCE,  // Negative (left)
+            offsetZ: (Math.cos(angleRad) - 1) * GROUP_DISTANCE,  // Slight Z adjustment
+            rotationY: -angleRad  // Rotate to face user
+          };
+        }
+        if (groupIndex === 2) {
+          // Third group: Right
+          const angleRad = GROUP_ANGLE * Math.PI / 180;
+          return {
+            offsetX: Math.sin(angleRad) * GROUP_DISTANCE,  // Positive (right)
+            offsetZ: (Math.cos(angleRad) - 1) * GROUP_DISTANCE,  // Slight Z adjustment
+            rotationY: -angleRad  // Rotate to face user
+          };
+        }
+        return { offsetX: 0, offsetZ: 0, rotationY: 0 };
+      };
+
+      // Step 3: Position each panel
+      // For side groups, we use a FIXED Z position (at user's eye level)
+      // so they don't overlap with main group's detail levels
+      const SIDE_GROUP_Z = -3;  // Fixed Z for side groups (comfortable viewing distance)
+
+      positionMap.forEach((pos, id) => {
+        const panel = panels.find(p => p.id === id);
+        const groupId = panel?.visualizationGroupId ?? 0;
+        const groupIndex = sortedGroups.indexOf(groupId);
+        const groupCenterX = groupCentersX.get(groupId) ?? 0;
+        const transform = getGroupTransform(groupId);
+
+        // Calculate panel position relative to its group center
+        const relativeX = pos.position[0] - groupCenterX;
+        const relativeY = pos.position[1];
+        const relativeZ = pos.position[2];
+
+        let finalX: number;
+        let finalY: number;
+        let finalZ: number;
+
+        if (groupIndex === 0) {
+          // Main group: Keep grammarLayout Z positions (detail levels)
+          finalX = relativeX + transform.offsetX;
+          finalY = relativeY + VR_Y_OFFSET;
+          finalZ = relativeZ + VR_Z_OFFSET;
+        } else {
+          // Side groups: Use FIXED Z position at user's eye level
+          // Panels are arranged horizontally (by relativeX) but all at same Z depth
+          finalX = relativeX + transform.offsetX;
+          finalY = relativeY + VR_Y_OFFSET;
+          finalZ = SIDE_GROUP_Z;  // Fixed Z - no grammarLayout depth, no offsetZ
+        }
+
+        console.log(`[VR Position] Panel ${id}: groupId=${groupId}, groupIndex=${groupIndex}, finalX=${finalX.toFixed(2)}, finalZ=${finalZ.toFixed(2)}`);
+
+        vrPositionMap.set(id, {
+          position: [finalX, finalY, finalZ] as [number, number, number],
+          rotation: [0, transform.rotationY, 0] as [number, number, number],
+          scale: pos.scale
+        });
+      });
+    }
 
     return (
       <>
@@ -207,6 +327,7 @@ export function DashboardScene() {
                 key={panel.id}
                 config={panel}
                 position={vrPos.position}
+                rotation={vrPos.rotation}
                 isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
                 onClick={() => handlePanelClick(panel.id)}
               />

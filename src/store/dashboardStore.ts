@@ -110,16 +110,23 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   isDragging: false,
   isLoading: false,
   error: null,
+  isInVR: false,
   currentInsights: null,
 
   setPanels: (panels: PanelConfig[]) => {
-    const root = panels.find((p) => !p.parentId);
+    // Assign group 0 to initial panels if not already set
+    const panelsWithGroups = panels.map(p => ({
+      ...p,
+      visualizationGroupId: p.visualizationGroupId ?? 0,
+    }));
+
+    const root = panelsWithGroups.find((p) => !p.parentId);
     const target = root
-      ? cameraForPanel(panels, root.id)
-      : overviewCameraFromPanels(panels);
+      ? cameraForPanel(panelsWithGroups, root.id)
+      : overviewCameraFromPanels(panelsWithGroups);
     set({
-      panels,
-      visiblePanelIds: allPanelIds(panels),
+      panels: panelsWithGroups,
+      visiblePanelIds: allPanelIds(panelsWithGroups),
       focusedPanelId: root?.id ?? null,
       cameraTarget: target,
       navigation: root
@@ -141,6 +148,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setCausalLinks: (links: CausalLink[]) => set({ causalLinks: links }),
   setLoading: (isLoading: boolean) => set({ isLoading }),
   setError: (error: string | null) => set({ error }),
+  setInVR: (isInVR: boolean) => set({ isInVR }),
 
   focusPanel: (id: string) => {
     const { panels, focusedPanelId } = get();
@@ -326,29 +334,95 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           meta: vizResponse.meta,
         });
 
+        const { isInVR, panels: existingPanels } = get();
+
+        // Detect VR mode from existing panel structure (multiple groups = VR mode)
+        // This handles cases where isInVR might not be set yet due to timing
+        const existingGroups = [...new Set(existingPanels.map(p => p.visualizationGroupId ?? 0))];
+        const hasMultipleGroups = existingGroups.length > 1;
+        const effectiveVRMode = isInVR || hasMultipleGroups;
+
+        console.log('[VoiceViz] Mode check:', {
+          isInVR,
+          effectiveVRMode,
+          existingPanelCount: existingPanels.length,
+          existingGroups
+        });
+
+        // Determine next visualization group ID
+        const maxGroupId = existingPanels.length > 0
+          ? Math.max(...existingPanels.map(p => p.visualizationGroupId ?? 0))
+          : -1;
+        const nextGroupId = maxGroupId + 1;
+
+        console.log('[VoiceViz] Group ID calculation:', { maxGroupId, nextGroupId });
+
         // Convert API charts to PanelConfig format
+        // IMPORTANT: Keep semantic addresses unchanged to preserve semantic structure
         const newPanels: PanelConfig[] = vizResponse.data.map((chart) => ({
           id: chart.id,
           title: chart.title,
           chartType: chart.chartType as any, // API types match our chart registry
           size: chart.size,
           data: chart.data,
-          semantic: chart.semantic,
+          semantic: chart.semantic, // Keep semantic addresses as-is from API
           processLabel: chart.processLabel,
           parentId: chart.parentId ?? undefined,
           segmentLabel: chart.segmentLabel ?? undefined,
+          // In VR mode (or if we already have multiple groups), assign incrementing group ID
+          visualizationGroupId: effectiveVRMode ? nextGroupId : 0,
         }));
 
-        // Replace entire panel structure with new visualization
-        // This prevents overlapping panels from multiple generations
-        set({
-          panels: newPanels,
-          visiblePanelIds: allPanelIds(newPanels),
+        console.log('[VoiceViz] New panels created:', {
+          count: newPanels.length,
+          groupId: newPanels[0]?.visualizationGroupId
         });
 
-        // Navigate to the first generated panel if any
-        if (newPanels.length > 0) {
-          get().focusPanel(newPanels[0].id);
+        // VR mode logic: ALWAYS append unless it's the very first group
+        // Desktop mode: Always replace to prevent overlapping
+        if (effectiveVRMode) {
+          if (existingPanels.length > 0) {
+            // VR mode with existing panels: Append new group
+            console.log('[VoiceViz] VR mode - APPENDING new group to existing panels');
+            const combinedPanels = [...existingPanels, ...newPanels];
+            console.log('[VoiceViz] Combined panels:', {
+              total: combinedPanels.length,
+              groups: [...new Set(combinedPanels.map(p => p.visualizationGroupId ?? 0))]
+            });
+
+            set({
+              panels: combinedPanels,
+              visiblePanelIds: allPanelIds(combinedPanels),
+            });
+
+            // Don't auto-focus - let user manually turn head to see new group
+            console.log('[VoiceViz] New group added - user can turn head to see it');
+          } else {
+            // VR mode with no existing panels: Create first group (group 0)
+            console.log('[VoiceViz] VR mode - Creating FIRST group (no existing panels)');
+            set({
+              panels: newPanels,
+              visiblePanelIds: allPanelIds(newPanels),
+            });
+
+            // Navigate to the first generated panel
+            if (newPanels.length > 0) {
+              get().focusPanel(newPanels[0].id);
+            }
+          }
+        } else {
+          // Desktop mode: Replace entire panel structure with new visualization
+          // This prevents overlapping panels from multiple generations
+          console.log('[VoiceViz] Desktop mode - REPLACING all panels');
+          set({
+            panels: newPanels,
+            visiblePanelIds: allPanelIds(newPanels),
+          });
+
+          // Navigate to the first generated panel in desktop mode
+          if (newPanels.length > 0) {
+            get().focusPanel(newPanels[0].id);
+          }
         }
 
         // Display and read out the key insights using Sarvam AI text-to-speech
