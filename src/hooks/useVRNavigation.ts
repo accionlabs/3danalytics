@@ -86,10 +86,10 @@ export function useVRNavigation() {
         const y = thumbstick.yAxis ?? 0;
 
         if (Math.abs(y) > MOVE_DEAD_ZONE) {
-          // Push forward (−Y) = up (+Y in world), pull back (+Y) = down (−Y in world)
-          // Since the world moves opposite to the user, we subtract from offset.y to move user up
+          // Push forward (−Y) = up (+Y in world coordinate system for user),
+          // pull back (+Y) = down (−Y in world coordinate system for user)
           const moveY = y * MOVE_SPEED * delta;
-          vrLocomotion.offset.y -= moveY;
+          vrLocomotion.offset.y += moveY;
         }
       }
     }

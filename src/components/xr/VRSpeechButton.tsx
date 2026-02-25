@@ -109,17 +109,17 @@ export function VRSpeechButton() {
   useFrame(() => {
     const buttonText =
       navState === 'navigating' ? 'FINDING...' :
-      navState === 'success' ? 'FOUND!' :
-      navState === 'error' ? 'ERROR' :
-      state === 'recording' ? 'STOP' :
-      state === 'processing' ? 'PROCESSING...' : 'VOICE'
+        navState === 'success' ? 'FOUND!' :
+          navState === 'error' ? 'ERROR' :
+            state === 'recording' ? 'STOP' :
+              state === 'processing' ? 'PROCESSING...' : 'ASK DATA AGENT'
 
     const color =
       navState === 'navigating' ? '#f59e0b' :
-      navState === 'success' ? '#10b981' :
-      navState === 'error' ? '#ef4444' :
-      state === 'recording' ? '#ef4444' :
-      state === 'processing' ? '#f59e0b' : '#3b82f6'
+        navState === 'success' ? '#10b981' :
+          navState === 'error' ? '#ef4444' :
+            state === 'recording' ? '#ef4444' :
+              state === 'processing' ? '#f59e0b' : '#3b82f6'
 
     if (buttonText !== lastText.current) {
       lastText.current = buttonText
@@ -133,7 +133,7 @@ export function VRSpeechButton() {
 
       // Button text
       ctx.fillStyle = '#ffffff'
-      ctx.font = 'bold 32px system-ui, sans-serif'
+      ctx.font = buttonText.length > 10 ? 'bold 24px system-ui, sans-serif' : 'bold 32px system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(buttonText, buttonCanvas.width / 2, buttonCanvas.height / 2)
@@ -159,8 +159,8 @@ export function VRSpeechButton() {
 
       const bgColor =
         navState === 'error' ? 'rgba(239, 68, 68, 0.9)' :
-        navState === 'success' ? 'rgba(16, 185, 129, 0.9)' :
-        'rgba(10, 10, 26, 0.9)'
+          navState === 'success' ? 'rgba(16, 185, 129, 0.9)' :
+            'rgba(10, 10, 26, 0.9)'
 
       ctx.fillStyle = bgColor
       ctx.fillRect(0, 0, feedbackCanvas.width, feedbackCanvas.height)
