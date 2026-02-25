@@ -31,9 +31,7 @@ export async function elevenLabsTranscribe(
     formData.append('file', audioBlob, 'record.webm');
     formData.append('model_id', options?.modelId || 'scribe_v1');
 
-    if (options?.languageCode) {
-      formData.append('language_code', options.languageCode);
-    }
+    formData.append('language_code', options?.languageCode || 'en');
 
     if (options?.diarize) {
       formData.append('diarize', 'true');

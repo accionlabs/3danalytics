@@ -35,9 +35,7 @@ export async function sarvamTranscribe(
       formData.append('mode', options.mode);
     }
 
-    if (options?.languageCode) {
-      formData.append('language_code', options.languageCode);
-    }
+    formData.append('language_code', options?.languageCode || 'en-IN');
 
     console.log('[Sarvam STT] Transcribing audio...');
 
