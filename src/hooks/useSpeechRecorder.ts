@@ -1,23 +1,24 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback } from 'react';
+import { transcribeAudio, getSTTProvider } from '../utils/sttManager.ts';
 
-export type RecordingState = 'idle' | 'recording' | 'processing'
+export type RecordingState = 'idle' | 'recording' | 'processing';
+export type STTProvider = 'native' | 'whisper' | 'sarvam' | 'elevenlabs';
 
 export interface UseSpeechRecorderReturn {
-  state: RecordingState
-  transcript: string
-  /** 'native' = Web Speech API (fast), 'whisper' = WASM fallback (slow) */
-  backend: 'native' | 'whisper'
-  startRecording: () => Promise<void>
-  stopRecording: () => void
-  clearTranscript: () => void
+  state: RecordingState;
+  transcript: string;
+  /** Current STT provider being used */
+  provider: STTProvider;
+  startRecording: () => Promise<void>;
+  stopRecording: () => void;
+  clearTranscript: () => void;
 }
 
 export interface UseSpeechRecorderOptions {
   /**
-   * Force the Whisper WASM backend even on browsers that support the native
-   * Web Speech API. Required for WebXR mode where the Speech API is unavailable.
+   * Force a specific provider, overriding env settings.
    */
-  forceWhisper?: boolean
+  provider?: STTProvider;
 }
 
 // ─── Backend detection ─────────────────────────────────────────────────────
@@ -28,195 +29,221 @@ export interface UseSpeechRecorderOptions {
 const NativeSpeechRecognition: (new () => SpeechRecognition) | undefined =
   typeof window !== 'undefined'
     ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition)
-    : undefined
+      ((window as any).SpeechRecognition ??
+      (window as any).webkitSpeechRecognition)
+    : undefined;
 
 // ─── Whisper pipeline (WASM fallback) ─────────────────────────────────────
 
-let transcriberPromise: Promise<unknown> | null = null
+let transcriberPromise: Promise<unknown> | null = null;
 
 async function getTranscriber() {
   if (!transcriberPromise) {
-    const { pipeline } = await import('@huggingface/transformers')
+    const { pipeline } = await import('@huggingface/transformers');
     transcriberPromise = pipeline(
       'automatic-speech-recognition',
       'Xenova/whisper-tiny.en',
     ).catch((err) => {
-      transcriberPromise = null
-      throw err
-    })
+      transcriberPromise = null;
+      throw err;
+    });
   }
-  return transcriberPromise
+  return transcriberPromise;
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     p,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms),
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+        ms,
+      ),
     ),
-  ])
+  ]);
 }
 
 // ─── Audio helpers (Whisper path only) ────────────────────────────────────
 
 async function blobToFloat32At16k(blob: Blob): Promise<Float32Array> {
-  const arrayBuffer = await blob.arrayBuffer()
-  const decodeCtx   = new AudioContext()
-  const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer)
-  await decodeCtx.close()
+  const arrayBuffer = await blob.arrayBuffer();
+  const decodeCtx = new AudioContext();
+  const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
+  await decodeCtx.close();
 
   // If the browser honoured the 16 kHz sampleRate constraint we skip resampling
-  if (audioBuffer.sampleRate === 16000) return audioBuffer.getChannelData(0)
+  if (audioBuffer.sampleRate === 16000) return audioBuffer.getChannelData(0);
 
-  const targetLen  = Math.ceil(audioBuffer.duration * 16000)
-  const offlineCtx = new OfflineAudioContext(1, targetLen, 16000)
-  const source     = offlineCtx.createBufferSource()
-  source.buffer    = audioBuffer
-  source.connect(offlineCtx.destination)
-  source.start(0)
-  const resampled  = await offlineCtx.startRendering()
-  return resampled.getChannelData(0)
+  const targetLen = Math.ceil(audioBuffer.duration * 16000);
+  const offlineCtx = new OfflineAudioContext(1, targetLen, 16000);
+  const source = offlineCtx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(offlineCtx.destination);
+  source.start(0);
+  const resampled = await offlineCtx.startRendering();
+  return resampled.getChannelData(0);
 }
 
 function padWithSilence(data: Float32Array, sr = 16000): Float32Array {
-  const pre    = Math.round(0.25 * sr)
-  const post   = Math.round(0.50 * sr)
-  const padded = new Float32Array(pre + data.length + post) // zero-filled
-  padded.set(data, pre)
-  return padded
+  const pre = Math.round(0.25 * sr);
+  const post = Math.round(0.5 * sr);
+  const padded = new Float32Array(pre + data.length + post); // zero-filled
+  padded.set(data, pre);
+  return padded;
 }
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
-export function useSpeechRecorder(options?: UseSpeechRecorderOptions): UseSpeechRecorderReturn {
-  const [state,      setState]      = useState<RecordingState>('idle')
-  const [transcript, setTranscript] = useState('')
+export function useSpeechRecorder(
+  options?: UseSpeechRecorderOptions,
+): UseSpeechRecorderReturn {
+  const [state, setState] = useState<RecordingState>('idle');
+  const [transcript, setTranscript] = useState('');
 
   // Native path refs
-  const recognitionRef        = useRef<SpeechRecognition | null>(null)
-  const nativeTranscriptRef   = useRef('')
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const nativeTranscriptRef = useRef('');
 
-  // Whisper path refs
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef        = useRef<Blob[]>([])
+  // Recorder path refs (API or Whisper)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  const backend: 'native' | 'whisper' =
-    !options?.forceWhisper && NativeSpeechRecognition ? 'native' : 'whisper'
+  const currentProvider = options?.provider || getSTTProvider();
 
   // ── Native: Web Speech API (Chrome / Edge / Safari) ─────────────────────
   const startNative = useCallback(() => {
-    const recognition             = new NativeSpeechRecognition!()
-    recognitionRef.current        = recognition
-    nativeTranscriptRef.current   = ''
+    if (!NativeSpeechRecognition) return;
+    const recognition = new NativeSpeechRecognition();
+    recognitionRef.current = recognition;
+    nativeTranscriptRef.current = '';
 
-    recognition.lang              = 'en-US'
-    recognition.continuous        = true   // keep listening until stopRecording()
-    recognition.interimResults    = false  // only final results
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = false;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       nativeTranscriptRef.current = Array.from(event.results)
         .map((r: SpeechRecognitionResult) => r[0].transcript)
         .join(' ')
-        .trim()
-    }
+        .trim();
+    };
 
     recognition.onend = () => {
-      setTranscript(nativeTranscriptRef.current)
-      setState('idle')
-    }
+      setTranscript(nativeTranscriptRef.current);
+      setState('idle');
+    };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('[SpeechRecorder] Native STT error:', event.error)
-      setState('idle')
-    }
+      console.error('[SpeechRecorder] Native STT error:', event.error);
+      setState('idle');
+    };
 
-    recognition.start()
-    setState('recording')
-
-    // Silently pre-warm Whisper model in case user's browser loses connectivity
-    getTranscriber().catch(() => {})
-  }, [])
+    recognition.start();
+    console.log(
+      '[SpeechRecorder] 🎙️ Started recording using: NATIVE (Web Speech API)',
+    );
+    setState('recording');
+  }, []);
 
   const stopNative = useCallback(() => {
-    setState('processing') // briefly shown while onend fires (< 1 s)
-    recognitionRef.current?.stop()
-  }, [])
+    setState('processing');
+    recognitionRef.current?.stop();
+  }, []);
 
-  // ── Whisper WASM fallback (Firefox + others) ─────────────────────────────
-  const startWhisper = useCallback(async () => {
+  // ── Recorder Path (API or Whisper) ─────────────────────────────
+  const startRecorder = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          // Request 16 kHz to avoid resampling; browser may or may not honour it
           sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
         },
-      })
-      const recorder         = new MediaRecorder(stream)
-      mediaRecorderRef.current = recorder
-      chunksRef.current        = []
+      });
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.start(250);
+      console.log(
+        `[SpeechRecorder] 🎙️ Started recording using: ${currentProvider.toUpperCase()}`,
+      );
+      setState('recording');
+
+      if (currentProvider === 'whisper') {
+        getTranscriber().catch(() => {});
       }
-
-      recorder.start(250) // flush chunks every 250 ms — no audio lost on stop
-      setState('recording')
-      getTranscriber().catch(() => {})
     } catch (err) {
-      console.error('[SpeechRecorder] Failed to start recording:', err)
+      console.error('[SpeechRecorder] Failed to start recording:', err);
     }
-  }, [])
+  }, [currentProvider]);
 
-  const stopWhisper = useCallback(() => {
-    const recorder = mediaRecorderRef.current
-    if (!recorder || recorder.state === 'inactive') return
+  const stopRecorder = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
 
     recorder.onstop = async () => {
-      setState('processing')
-      recorder.stream.getTracks().forEach((t) => t.stop())
+      setState('processing');
+      recorder.stream.getTracks().forEach((t) => t.stop());
 
       try {
-        const blob       = new Blob(chunksRef.current, { type: 'audio/webm' })
-        const raw        = await blobToFloat32At16k(blob)
-        const padded     = padWithSilence(raw)
-        const transcriber = await getTranscriber() as (
-          data: Float32Array,
-          opts: { sampling_rate: number },
-        ) => Promise<{ text: string }>
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
 
-        const result = await withTimeout(
-          transcriber(padded, { sampling_rate: 16000 }),
-          60_000,
-          'Transcription',
-        )
-        setTranscript(result.text?.trim() ?? '')
+        if (currentProvider === 'sarvam' || currentProvider === 'elevenlabs') {
+          // Use API provider
+          const text = await transcribeAudio(blob);
+          setTranscript(text);
+        } else {
+          // Fallback to local Whisper
+          const raw = await blobToFloat32At16k(blob);
+          const padded = padWithSilence(raw);
+          const transcriber = (await getTranscriber()) as (
+            data: Float32Array,
+            opts: { sampling_rate: number },
+          ) => Promise<{ text: string }>;
+
+          const result = await withTimeout(
+            transcriber(padded, { sampling_rate: 16000 }),
+            60_000,
+            'Transcription',
+          );
+          setTranscript(result.text?.trim() ?? '');
+        }
       } catch (err) {
-        console.error('[SpeechRecorder] Transcription failed:', err)
-        setTranscript('[Transcription failed — check console for details]')
+        console.error('[SpeechRecorder] Transcription failed:', err);
+        setTranscript('[Transcription failed — check console for details]');
       } finally {
-        setState('idle')
+        setState('idle');
       }
-    }
+    };
 
-    recorder.stop()
-  }, [])
+    recorder.stop();
+  }, [currentProvider]);
 
   // ── Public API ───────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
-    if (backend === 'native') startNative()
-    else await startWhisper()
-  }, [backend, startNative, startWhisper])
+    if (currentProvider === 'native') startNative();
+    else await startRecorder();
+  }, [currentProvider, startNative, startRecorder]);
 
   const stopRecording = useCallback(() => {
-    if (backend === 'native') stopNative()
-    else stopWhisper()
-  }, [backend, stopNative, stopWhisper])
+    if (currentProvider === 'native') stopNative();
+    else stopRecorder();
+  }, [currentProvider, stopNative, stopRecorder]);
 
-  const clearTranscript = useCallback(() => setTranscript(''), [])
+  const clearTranscript = useCallback(() => setTranscript(''), []);
 
-  return { state, transcript, backend, startRecording, stopRecording, clearTranscript }
+  return {
+    state,
+    transcript,
+    provider: currentProvider,
+    startRecording,
+    stopRecording,
+    clearTranscript,
+  };
 }

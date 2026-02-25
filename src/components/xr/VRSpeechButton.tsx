@@ -21,7 +21,7 @@ export function VRSpeechButton() {
   const [showFeedback, setShowFeedback] = useState(false)
 
   const { state, transcript, startRecording, stopRecording, clearTranscript } =
-    useSpeechRecorder({ forceWhisper: true }) // Always use Whisper in VR
+    useSpeechRecorder({ provider: 'whisper' }) // Always use Whisper in VR for now as a baseline
 
   const handleVoiceNavigation = useDashboardStore((s) => s.handleVoiceNavigation)
   const setInVR = useDashboardStore((s) => s.setInVR)

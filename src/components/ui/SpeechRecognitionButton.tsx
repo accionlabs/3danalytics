@@ -26,11 +26,11 @@ export function SpeechRecognitionButton({
   const {
     state,
     transcript,
-    backend,
+    provider,
     startRecording,
     stopRecording,
     clearTranscript,
-  } = useSpeechRecorder({ forceWhisper });
+  } = useSpeechRecorder({ provider: forceWhisper ? 'whisper' : undefined });
 
   const handleVoiceNavigation = useDashboardStore(
     (s) => s.handleVoiceNavigation,
@@ -165,7 +165,7 @@ export function SpeechRecognitionButton({
             {navState === 'navigating' && (
               <>
                 <div className="spinner" />
-                Processing ({backend})
+                Processing ({provider})
               </>
             )}
             {navState === 'success' && '✓ Success'}

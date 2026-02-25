@@ -25,18 +25,24 @@ export type TTSProvider = 'sarvam' | 'elevenlabs' | 'webspeech';
  * Get the current TTS provider from environment variables
  */
 export function getTTSProvider(): TTSProvider {
-  const provider = import.meta.env.VITE_TTS_PROVIDER as string;
-  if (provider === 'elevenlabs') return 'elevenlabs';
-  if (provider === 'webspeech') return 'webspeech';
-  return 'sarvam'; // Default to sarvam
+  const provider = (import.meta.env.VITE_TTS_PROVIDER as string) || 'sarvam';
+  return provider as TTSProvider;
 }
+
+// Initial log to identify the service on load
+console.log(
+  `%c[TTS Service] Active Provider: ${getTTSProvider()}`,
+  'color: #8b5cf6; font-weight: bold; font-size: 12px;',
+);
 
 /**
  * Speak an array of insights using the configured provider
  */
 export async function speakInsights(insights: string[]): Promise<void> {
   const provider = getTTSProvider();
-  console.log(`[TTS Manager] Using provider: ${provider}`);
+  console.log(
+    `[TTS Manager] 🔊 Speaking insights using: ${provider.toUpperCase()}`,
+  );
 
   switch (provider) {
     case 'elevenlabs': {
