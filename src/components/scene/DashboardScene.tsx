@@ -1,7 +1,7 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react'
-import { useThree, useFrame } from '@react-three/fiber'
+import { useMemo, useCallback, useEffect } from 'react'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { useXR, XROrigin } from '@react-three/xr'
+import { XROrigin } from '@react-three/xr'
 import { useDashboardStore } from '../../store/dashboardStore.ts'
 import { grammarLayout, Z_SPACING, Z_BASE } from '../../layouts/grammarLayout.ts'
 import { DashboardPanel } from './DashboardPanel.tsx'
@@ -17,52 +17,7 @@ import { PostProcessing } from './PostProcessing.tsx'
 import { Connectors } from './Connectors.tsx'
 import { useXRSession } from '../../xr/useXRSession.ts'
 
-/** Debug display in VR — colored boxes encode XR state as colors */
-function VRDebugDisplay() {
-  const xrMode = useXR((s) => s.mode)
-  const gl = useThree((s) => s.gl)
-  const matRef = useRef<THREE.MeshBasicMaterial>(null)
-  const posRef = useRef<THREE.MeshBasicMaterial>(null)
-
-  useFrame(({ camera }) => {
-    // Left box: green if presenting, red if not
-    if (matRef.current) {
-      matRef.current.color.set(gl.xr.isPresenting ? '#00ff00' : '#ff0000')
-    }
-    // Right box: blue if camera is ArrayCamera, yellow if PerspectiveCamera
-    if (posRef.current) {
-      posRef.current.color.set(camera.type === 'ArrayCamera' ? '#0088ff' : '#ffff00')
-    }
-  })
-
-  return (
-    <group position={[0, 3, 0]}>
-      {/* Large banner box so we can see something */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[4, 0.5, 0.1]} />
-        <meshBasicMaterial color="#1a1a3a" />
-      </mesh>
-
-      {/* Left indicator: green=presenting, red=not presenting */}
-      <mesh position={[-1.2, 0, 0.06]}>
-        <boxGeometry args={[0.6, 0.3, 0.05]} />
-        <meshBasicMaterial ref={matRef} color="#ff0000" />
-      </mesh>
-
-      {/* Right indicator: blue=ArrayCamera(XR), yellow=PerspectiveCamera(desktop) */}
-      <mesh position={[1.2, 0, 0.06]}>
-        <boxGeometry args={[0.6, 0.3, 0.05]} />
-        <meshBasicMaterial ref={posRef} color="#ffff00" />
-      </mesh>
-
-      {/* Mode indicator: cyan=immersive-vr, magenta=other */}
-      <mesh position={[0, 0, 0.06]}>
-        <boxGeometry args={[0.6, 0.3, 0.05]} />
-        <meshBasicMaterial color={xrMode === 'immersive-vr' ? '#00ffff' : '#ff00ff'} />
-      </mesh>
-    </group>
-  )
-}
+// VR mode: world content inside VRNavigation's offset group.
 
 /** Default distanceFactor (matches DashboardPanel's DEFAULT_DF) */
 const DEFAULT_DF = 2
@@ -334,7 +289,6 @@ export function DashboardScene() {
       <>
         <XROrigin position={[0, 0, 0]} />
         <VRNavigation>
-          <VRDebugDisplay />
           <Environment />
           <VRAxisLabels yOffset={VR_Y_OFFSET} zOffset={VR_Z_OFFSET} />
           {panels.map((panel) => {
