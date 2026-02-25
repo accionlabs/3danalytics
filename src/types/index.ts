@@ -2,165 +2,174 @@
 
 /** Semantic address in the 3D grammar space */
 export interface SemanticAddress {
-  processStep: number        // X-axis (0 = leftmost in pipeline)
-  segment: number | null     // Y-axis (null = aggregated across segments)
-  detailLevel: number        // Z-axis (0 = summary, 1+ = granular)
+  processStep: number; // X-axis (0 = leftmost in pipeline)
+  segment: number | null; // Y-axis (null = aggregated across segments)
+  detailLevel: number; // Z-axis (0 = summary, 1+ = granular)
 }
 
 /** Causal/structural link between panels */
 export interface CausalLink {
-  from: string               // panel id
-  to: string                 // panel id
-  type: 'causal' | 'segment' | 'hierarchy'
+  from: string; // panel id
+  to: string; // panel id
+  type: 'causal' | 'segment' | 'hierarchy';
 }
 
 /** Panel definition — chartType is string, not a union.
  *  The shell doesn't know what chart types exist. */
 export interface PanelConfig {
-  id: string
-  title: string
-  chartType: string
-  size: { width: number; height: number }
-  data: unknown
-  semantic: SemanticAddress   // REQUIRED — every panel has a grammar address
-  parentId?: string           // Z-axis parent panel
-  segmentLabel?: string       // "Enterprise", "SMB", "Startup"
-  processLabel?: string       // "Marketing", "Leads", "Pipeline"
-  visualizationGroupId?: number // Group ID for VR mode - multiple visualizations can coexist
+  id: string;
+  title: string;
+  chartType: string;
+  size: { width: number; height: number };
+  data: unknown;
+  semantic: SemanticAddress; // REQUIRED — every panel has a grammar address
+  parentId?: string; // Z-axis parent panel
+  segmentLabel?: string; // "Enterprise", "SMB", "Startup"
+  processLabel?: string; // "Marketing", "Leads", "Pipeline"
+  visualizationGroupId?: number; // Group ID for VR mode - multiple visualizations can coexist
 }
 
 /** Chart renderer contract — any chart component must satisfy this */
 export interface ChartRendererProps {
-  data: unknown
-  width: number
-  height: number
-  onItemClick?: (index: number, category?: string) => void
-  onDrillTo?: (panelId: string) => void
+  data: unknown;
+  width: number;
+  height: number;
+  onItemClick?: (index: number, category?: string) => void;
+  onDrillTo?: (panelId: string) => void;
 }
-export type ChartRenderer = React.ComponentType<ChartRendererProps>
+export type ChartRenderer = React.ComponentType<ChartRendererProps>;
 
 /** 3D position for a panel */
 export interface PanelPosition {
-  position: [number, number, number]
-  rotation: [number, number, number]
-  scale: number
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: number;
 }
 
 /** Camera target */
 export interface CameraTarget {
-  position: [number, number, number]
-  lookAt: [number, number, number]
-  fov?: number
+  position: [number, number, number];
+  lookAt: [number, number, number];
+  fov?: number;
 }
 
 /** Navigation step for axis-aware history */
 export interface NavigationStep {
-  panelId: string
-  axis: 'x' | 'y' | 'z' | 'home'
-  label: string
-  cameraTarget: CameraTarget
+  panelId: string;
+  axis: 'x' | 'y' | 'z' | 'home';
+  label: string;
+  cameraTarget: CameraTarget;
 }
 
 /** Navigation history with back/forward support */
 export interface NavigationHistory {
-  steps: NavigationStep[]
-  currentIndex: number
+  steps: NavigationStep[];
+  currentIndex: number;
 }
 
 /** Dashboard state (Zustand) */
 export interface DashboardState {
-  panels: PanelConfig[]
-  causalLinks: CausalLink[]
-  focusedPanelId: string | null
-  navigation: NavigationHistory
-  visiblePanelIds: string[]
-  cameraTarget: CameraTarget
-  isTransitioning: boolean
-  isDragging: boolean
-  isLoading: boolean
-  error: string | null
-  isInVR: boolean
+  panels: PanelConfig[];
+  causalLinks: CausalLink[];
+  focusedPanelId: string | null;
+  navigation: NavigationHistory;
+  visiblePanelIds: string[];
+  cameraTarget: CameraTarget;
+  isTransitioning: boolean;
+  isDragging: boolean;
+  isLoading: boolean;
+  error: string | null;
+  isInVR: boolean;
   // Voice insights notification
-  currentInsights: string[] | null
+  currentInsights: string[] | null;
   // Actions
-  setPanels: (panels: PanelConfig[]) => void
-  setCausalLinks: (links: CausalLink[]) => void
-  setLoading: (loading: boolean) => void
-  setError: (error: string | null) => void
-  setInVR: (isInVR: boolean) => void
-  focusPanel: (id: string) => void
-  unfocus: () => void
-  navigateTo: (panelId: string, axis: 'x' | 'y' | 'z') => void
-  navigateBack: () => void
-  navigateForward: () => void
-  navigateHome: () => void
-  navigateToStep: (index: number) => void
-  setTransitioning: (isTransitioning: boolean) => void
-  setDragging: (isDragging: boolean) => void
-  setCurrentInsights: (insights: string[] | null) => void
-  handleVoiceNavigation: (transcript: string) => Promise<{ success: boolean; panelId?: string; error?: string }>
+  setPanels: (panels: PanelConfig[]) => void;
+  setCausalLinks: (links: CausalLink[]) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+  setInVR: (isInVR: boolean) => void;
+  setFocusedPanelId: (id: string | null) => void;
+  focusPanel: (id: string) => void;
+  unfocus: () => void;
+  navigateTo: (panelId: string, axis: 'x' | 'y' | 'z') => void;
+  navigateBack: () => void;
+  navigateForward: () => void;
+  navigateHome: () => void;
+  navigateToStep: (index: number) => void;
+  setTransitioning: (isTransitioning: boolean) => void;
+  setDragging: (isDragging: boolean) => void;
+  setCurrentInsights: (insights: string[] | null) => void;
+  handleVoiceNavigation: (
+    transcript: string,
+  ) => Promise<{ success: boolean; panelId?: string; error?: string }>;
 }
 
 // ── SaaS content pack types (domain-specific) ──
 
 export interface RevenueDataPoint {
-  month: string
-  mrr: number
-  arr: number
-  newRevenue: number
-  churnedRevenue: number
+  month: string;
+  mrr: number;
+  arr: number;
+  newRevenue: number;
+  churnedRevenue: number;
 }
 
 export interface ChurnDataPoint {
-  month: string
-  churnRate: number
-  customers: number
-  churned: number
+  month: string;
+  churnRate: number;
+  customers: number;
+  churned: number;
 }
 
 export interface CohortRow {
-  cohort: string
-  retention: number[]
+  cohort: string;
+  retention: number[];
 }
 
 export interface FunnelStage {
-  stage: string
-  count: number
-  conversionRate: number
+  stage: string;
+  count: number;
+  conversionRate: number;
 }
 
 export interface KpiMetric {
-  label: string
-  value: number
-  unit: string
-  trend: number
-  trendDirection: 'up' | 'down' | 'flat'
+  label: string;
+  value: number;
+  unit: string;
+  trend: number;
+  trendDirection: 'up' | 'down' | 'flat';
 }
 
 export interface GeoRegion {
-  region: string
-  revenue: number
-  customers: number
+  region: string;
+  revenue: number;
+  customers: number;
 }
 
 export interface ProductRevenue {
-  product: string
-  revenue: number
-  growth: number
+  product: string;
+  revenue: number;
+  growth: number;
 }
 
 // ── Embed types (for iframe-based panel rendering) ──
 
-export type EmbedProvider = 'powerbi' | 'tableau' | 'looker-studio' | 'metabase' | 'looker' | 'custom'
+export type EmbedProvider =
+  | 'powerbi'
+  | 'tableau'
+  | 'looker-studio'
+  | 'metabase'
+  | 'looker'
+  | 'custom';
 
 export interface EmbedConfig {
-  url: string
-  provider: EmbedProvider
-  interactive?: boolean
-  label?: string
-  sandbox?: string
-  authToken?: string
-  refreshInterval?: number
-  fallbackMessage?: string
-  drillMap?: Record<string, string>  // category label → child panel ID
+  url: string;
+  provider: EmbedProvider;
+  interactive?: boolean;
+  label?: string;
+  sandbox?: string;
+  authToken?: string;
+  refreshInterval?: number;
+  fallbackMessage?: string;
+  drillMap?: Record<string, string>; // category label → child panel ID
 }

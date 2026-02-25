@@ -75,6 +75,7 @@ export function DashboardScene() {
   const causalLinks = useDashboardStore((s) => s.causalLinks)
   const focusedPanelId = useDashboardStore((s) => s.focusedPanelId)
   const focusPanel = useDashboardStore((s) => s.focusPanel)
+  const setFocusedPanelId = useDashboardStore((s) => s.setFocusedPanelId)
   const setInVR = useDashboardStore((s) => s.setInVR)
   const gl = useThree((s) => s.gl)
 
@@ -172,6 +173,14 @@ export function DashboardScene() {
       blurAndFocus(panelId)
     },
     [focusedPanelId, childMap, blurAndFocus],
+  )
+
+  // VR-specific: Just highlight, no camera movement
+  const handleVRPanelClick = useCallback(
+    (panelId: string) => {
+      setFocusedPanelId(panelId)
+    },
+    [setFocusedPanelId],
   )
 
   // VR mode: world content inside VRNavigation's offset group.
@@ -341,7 +350,7 @@ export function DashboardScene() {
                 scale={vrPos.scale}
                 isFocused={focusedPanelId === panel.id}
                 isDimmed={focusedPanelId !== null && focusedPanelId !== panel.id}
-                onClick={() => handlePanelClick(panel.id)}
+                onClick={() => handleVRPanelClick(panel.id)}
               />
             )
           })}

@@ -115,7 +115,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   setPanels: (panels: PanelConfig[]) => {
     // Assign group 0 to initial panels if not already set
-    const panelsWithGroups = panels.map(p => ({
+    const panelsWithGroups = panels.map((p) => ({
       ...p,
       visualizationGroupId: p.visualizationGroupId ?? 0,
     }));
@@ -149,6 +149,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setLoading: (isLoading: boolean) => set({ isLoading }),
   setError: (error: string | null) => set({ error }),
   setInVR: (isInVR: boolean) => set({ isInVR }),
+  setFocusedPanelId: (id: string | null) => set({ focusedPanelId: id }),
 
   focusPanel: (id: string) => {
     const { panels, focusedPanelId } = get();
@@ -338,7 +339,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
         // Detect VR mode from existing panel structure (multiple groups = VR mode)
         // This handles cases where isInVR might not be set yet due to timing
-        const existingGroups = [...new Set(existingPanels.map(p => p.visualizationGroupId ?? 0))];
+        const existingGroups = [
+          ...new Set(existingPanels.map((p) => p.visualizationGroupId ?? 0)),
+        ];
         const hasMultipleGroups = existingGroups.length > 1;
         const effectiveVRMode = isInVR || hasMultipleGroups;
 
@@ -346,16 +349,22 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           isInVR,
           effectiveVRMode,
           existingPanelCount: existingPanels.length,
-          existingGroups
+          existingGroups,
         });
 
         // Determine next visualization group ID
-        const maxGroupId = existingPanels.length > 0
-          ? Math.max(...existingPanels.map(p => p.visualizationGroupId ?? 0))
-          : -1;
+        const maxGroupId =
+          existingPanels.length > 0
+            ? Math.max(
+                ...existingPanels.map((p) => p.visualizationGroupId ?? 0),
+              )
+            : -1;
         const nextGroupId = maxGroupId + 1;
 
-        console.log('[VoiceViz] Group ID calculation:', { maxGroupId, nextGroupId });
+        console.log('[VoiceViz] Group ID calculation:', {
+          maxGroupId,
+          nextGroupId,
+        });
 
         // Convert API charts to PanelConfig format
         // IMPORTANT: Keep semantic addresses unchanged to preserve semantic structure
@@ -375,7 +384,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
         console.log('[VoiceViz] New panels created:', {
           count: newPanels.length,
-          groupId: newPanels[0]?.visualizationGroupId
+          groupId: newPanels[0]?.visualizationGroupId,
         });
 
         // VR mode logic: ALWAYS append unless it's the very first group
@@ -383,11 +392,17 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         if (effectiveVRMode) {
           if (existingPanels.length > 0) {
             // VR mode with existing panels: Append new group
-            console.log('[VoiceViz] VR mode - APPENDING new group to existing panels');
+            console.log(
+              '[VoiceViz] VR mode - APPENDING new group to existing panels',
+            );
             const combinedPanels = [...existingPanels, ...newPanels];
             console.log('[VoiceViz] Combined panels:', {
               total: combinedPanels.length,
-              groups: [...new Set(combinedPanels.map(p => p.visualizationGroupId ?? 0))]
+              groups: [
+                ...new Set(
+                  combinedPanels.map((p) => p.visualizationGroupId ?? 0),
+                ),
+              ],
             });
 
             set({
@@ -396,10 +411,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
             });
 
             // Don't auto-focus - let user manually turn head to see new group
-            console.log('[VoiceViz] New group added - user can turn head to see it');
+            console.log(
+              '[VoiceViz] New group added - user can turn head to see it',
+            );
           } else {
             // VR mode with no existing panels: Create first group (group 0)
-            console.log('[VoiceViz] VR mode - Creating FIRST group (no existing panels)');
+            console.log(
+              '[VoiceViz] VR mode - Creating FIRST group (no existing panels)',
+            );
             set({
               panels: newPanels,
               visiblePanelIds: allPanelIds(newPanels),

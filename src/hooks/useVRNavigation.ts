@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   useXRInputSourceState,
@@ -6,17 +6,12 @@ import {
 } from '@react-three/xr';
 import * as THREE from 'three';
 import { useDashboardStore } from '../store/dashboardStore.ts';
-import { findNeighbor } from './useKeyboardNavigation.ts';
 import { vrLocomotion } from '../components/xr/XRTeleport.tsx';
 
 /** Smooth locomotion speed in meters/second */
 const MOVE_SPEED = 3.0;
 /** Thumbstick dead zone for smooth movement */
 const MOVE_DEAD_ZONE = 0.15;
-/** Thumbstick dead zone for discrete navigation */
-const NAV_DEAD_ZONE = 0.5;
-/** Cooldown between discrete axis navigations in ms */
-const NAV_COOLDOWN_MS = 400;
 
 /**
  * VR controller input — combines smooth locomotion with discrete panel navigation.
@@ -32,38 +27,9 @@ export function useVRNavigation() {
   const rightController = useXRInputSourceState('controller', 'right');
   const { camera } = useThree();
 
-  const lastNavTime = useRef(0);
-  // const lastSnapTime = useRef(0)
-
   // Temp vectors to avoid allocation
   const _forward = useRef(new THREE.Vector3());
   const _right = useRef(new THREE.Vector3());
-
-  const navigateAxis = useCallback(
-    (axis: 'x' | 'y' | 'z', direction: 1 | -1) => {
-      const now = Date.now();
-      if (now - lastNavTime.current < NAV_COOLDOWN_MS) return;
-      lastNavTime.current = now;
-
-      const state = useDashboardStore.getState();
-      const current = state.panels.find((p) => p.id === state.focusedPanelId);
-      if (!current) return;
-
-      if (axis === 'z' && direction === -1) {
-        state.navigateBack();
-        return;
-      }
-
-      const neighbor = findNeighbor(state.panels, current, axis, direction);
-      if (neighbor) {
-        state.navigateTo(neighbor.id, axis);
-        // Reset locomotion offset on panel teleport so user starts fresh at new panel
-        vrLocomotion.offset.set(0, 0, 0);
-        vrLocomotion.yaw = 0;
-      }
-    },
-    [],
-  );
 
   // Squeeze (grip) on either controller → navigate back
   useXRControllerButtonEvent(leftController, 'xr-standard-squeeze', (state) => {
@@ -113,23 +79,17 @@ export function useVRNavigation() {
       }
     }
 
-    // ── Right thumbstick ──
+    // ── Right thumbstick: Vertical altitude control ──
     if (rightController) {
       const thumbstick = rightController.gamepad?.['xr-standard-thumbstick'];
       if (thumbstick) {
-        const x = thumbstick.xAxis ?? 0;
         const y = thumbstick.yAxis ?? 0;
 
-        // Left/right: navigate X-axis panels (processStep: pipeline position)
-        if (Math.abs(x) > NAV_DEAD_ZONE && Math.abs(x) > Math.abs(y)) {
-          // Right (+X) = next processStep, Left (−X) = prev processStep
-          navigateAxis('x', x > 0 ? 1 : -1);
-        }
-
-        // Up/down: navigate Y-axis panels (segment: customer segment)
-        if (Math.abs(y) > NAV_DEAD_ZONE && Math.abs(y) > Math.abs(x)) {
-          // Push forward (−Y) = next segment, pull back (+Y) = prev segment
-          navigateAxis('y', y < 0 ? 1 : -1);
+        if (Math.abs(y) > MOVE_DEAD_ZONE) {
+          // Push forward (−Y) = up (+Y in world), pull back (+Y) = down (−Y in world)
+          // Since the world moves opposite to the user, we subtract from offset.y to move user up
+          const moveY = y * MOVE_SPEED * delta;
+          vrLocomotion.offset.y -= moveY;
         }
       }
     }
