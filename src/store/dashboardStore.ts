@@ -12,7 +12,7 @@ import {
   navigateByVoice,
   generateVisualization,
 } from '../services/chartApi.ts';
-import { speakInsights } from '../utils/sarvamTTS.ts';
+import { speakInsights } from '../utils/ttsManager.ts';
 
 /** Default overview camera — centered on the grammar layout */
 const OVERVIEW_CAMERA: CameraTarget = {
@@ -454,12 +454,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           // Show insights notification to user
           get().setCurrentInsights(vizResponse.keyInsights);
 
-          // Use Sarvam AI with optimized settings for natural-sounding speech
-          speakInsights(vizResponse.keyInsights, {
-            language: 'en-IN', // Sarvam AI English (India)
-            speaker: 'sunny', // Natural-sounding voice
-            speed: 1.2, // Slightly slower for clarity
-          });
+          // Use unified TTS manager to speak insights
+          speakInsights(vizResponse.keyInsights);
 
           // Auto-dismiss insights after 20 seconds (enough time to read them)
           setTimeout(() => {

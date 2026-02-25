@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { stopSpeaking } from '../../utils/sarvamTTS.ts'
+import { stopSpeaking } from '../../utils/ttsManager.ts'
 
 export interface InsightsNotificationProps {
   /** Array of insights to display */
@@ -22,6 +22,14 @@ export function InsightsNotification({
   const [isVisible, setIsVisible] = useState(true)
   const [isAnimating, setIsAnimating] = useState(false)
 
+  const handleDismiss = () => {
+    setIsAnimating(false)
+    setTimeout(() => {
+      setIsVisible(false)
+      onDismiss?.()
+    }, 300)
+  }
+
   useEffect(() => {
     // Fade in animation
     setIsAnimating(true)
@@ -33,15 +41,7 @@ export function InsightsNotification({
       }, autoDismiss)
       return () => clearTimeout(timer)
     }
-  }, [autoDismiss])
-
-  const handleDismiss = () => {
-    setIsAnimating(false)
-    setTimeout(() => {
-      setIsVisible(false)
-      onDismiss?.()
-    }, 300)
-  }
+  }, [autoDismiss, handleDismiss])
 
   const handleSkip = () => {
     stopSpeaking()
