@@ -111,7 +111,7 @@ export function SpeechRecognitionButton({
     if (navState === 'error') return 'Try Again';
     if (state === 'recording') return 'Listening...';
     if (state === 'processing') return 'Processing...';
-    return 'Tap to Speak';
+    return 'Query data agent';
   };
 
   const isActive = state === 'recording';
@@ -196,7 +196,7 @@ export function SpeechRecognitionButton({
       <div
         style={{
           position: 'absolute',
-          bottom: 20,
+          bottom: 80,
           right: 20,
           zIndex: 10000,
           transform: `scale(${uiScale})`,
